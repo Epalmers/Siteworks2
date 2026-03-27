@@ -5,6 +5,47 @@
 
 ---
 
+## ⚡ Quick Start — Download & Run in 4 Steps
+
+> **No Git experience needed.** Follow option A or B below, then complete steps 2–4.
+
+### Option A — Download as a ZIP (easiest)
+1. Click the green **`< > Code`** button at the top of this GitHub page.
+2. Select **"Download ZIP"**.
+3. Unzip the downloaded file to a folder on your computer.
+
+### Option B — Clone with Git (if you have Git installed)
+```bash
+git clone https://github.com/Epalmers/Siteworks2.git
+cd Siteworks2
+```
+
+---
+
+### Step 2 — Install Python (if you haven't already)
+Siteworks requires **Python 3.9 or newer**.  
+Download it for free from [python.org/downloads](https://www.python.org/downloads/).  
+During installation, check the box that says **"Add Python to PATH"**.
+
+### Step 3 — Install the app's dependencies
+Open a terminal / command prompt **inside the project folder**, then run:
+```bash
+pip install -r requirements.txt
+```
+This installs Streamlit, Plotly, and the other libraries the app needs (takes ~1–2 minutes).
+
+### Step 4 — Launch the dashboard
+```bash
+streamlit run app.py
+```
+A browser window will open automatically at **http://localhost:8501** showing the dashboard.  
+If it doesn't open automatically, copy that address into your browser.
+
+> **Tip:** The app works out of the box with its built-in pilot data — no Excel file required.  
+> To use your own workbook, place `Data_Center_Site_Selector_RH.xlsx` in the `data/` folder and restart.
+
+---
+
 ## What Is Siteworks?
 
 Siteworks is a weighted multi-criteria decision analysis (MCDA) dashboard that helps non-engineer decision-makers evaluate whether a company should build a data center in a given city, based on water availability, climate, natural hazards, economics, and biodiversity factors.
@@ -91,31 +132,33 @@ Cities are sorted from highest total score (most suitable) to lowest.
 
 ---
 
-## How to Run the App Locally
+## Full Setup Reference
 
-### 1. Clone the repo
+> **New here?** See the [Quick Start](#-quick-start--download--run-in-4-steps) section at the top of this file.
+
+### Clone the repo
 ```bash
 git clone https://github.com/Epalmers/Siteworks2.git
 cd Siteworks2
 ```
 
-### 2. Install dependencies
+### Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. (Optional) Add the Excel workbook
+### (Optional) Add the Excel workbook
 Place `Data_Center_Site_Selector_RH.xlsx` in the `/data/` folder.  
 If the file is absent, the app uses its built-in pilot dataset.
 
-### 4. Run the app
+### Run the app
 ```bash
 streamlit run app.py
 ```
 
 The app opens in your browser at `http://localhost:8501`.
 
-### 5. Run the tests
+### Run the tests
 ```bash
 pytest tests/ -v
 ```
