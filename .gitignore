@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Data files (large binaries – add manually if needed)
+data/*.xlsx
+data/*.docx
+data/*.pptx
+
+# Editor / OS
+.idea/
+.vscode/
+*.DS_Store
+*.swp
+.env
+
+# Test artifacts
+.pytest_cache/
+htmlcov/
+.coverage
