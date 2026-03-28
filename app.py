@@ -5,13 +5,40 @@ CIVE-580: Applying AI in Environmental Engineering
 
 Run with:
     streamlit run app.py
+    python app.py          # same effect: starts Streamlit in your browser
 """
 
 import sys
 from pathlib import Path
 
 # Ensure the project root is on sys.path so `src` is importable.
-sys.path.insert(0, str(Path(__file__).parent))
+_APP_ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(_APP_ROOT))
+
+# If someone runs `python app.py` instead of `streamlit run app.py`, re-exec under
+# Streamlit so the dashboard actually starts. When Streamlit loads this file,
+# `streamlit` is already imported, so we skip this branch (avoids recursion).
+if __name__ == "__main__" and "streamlit" not in sys.modules:
+    import importlib.util
+
+    if importlib.util.find_spec("streamlit") is None:
+        print(
+            "Streamlit is not installed for this Python interpreter:\n"
+            f"  {sys.executable}\n\n"
+            "From the project folder, install dependencies:\n"
+            "  python -m pip install -r requirements.txt\n"
+            "Or create a venv and install (recommended):\n"
+            "  .\\setup.ps1\n",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+
+    import subprocess
+
+    rc = subprocess.call(
+        [sys.executable, "-m", "streamlit", "run", str(Path(__file__).resolve()), *sys.argv[1:]]
+    )
+    raise SystemExit(rc)
 
 import streamlit as st
 

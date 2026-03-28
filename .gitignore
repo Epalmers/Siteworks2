@@ -22,7 +22,6 @@ data/*.pptx
 
 # Editor / OS
 .idea/
-.vscode/
 *.DS_Store
 *.swp
 .env
