@@ -48,7 +48,7 @@ def render_ranking_table(results: List[ScoringResult]) -> None:
         .set_properties(**{"text-align": "center"})
     )
 
-    st.dataframe(styled, use_container_width=True, hide_index=True)
+    st.dataframe(styled, width="stretch", hide_index=True)
 
 
 def render_subcategory_table(
@@ -91,6 +91,6 @@ def render_subcategory_table(
 
     st.dataframe(
         df_display[["Category", "Subcategory", "Score", "Raw Value", "Description"]],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )

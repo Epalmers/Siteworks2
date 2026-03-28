@@ -63,11 +63,12 @@ from src.ui.tables import render_ranking_table, render_subcategory_table
 from src.ui.compare import render_comparison_view
 from src.ui.explainers import (
     render_summary_panel,
-    render_scoring_explainer,
-    render_category_explainer,
+    render_scoring_explainer_body,
+    render_category_explainer_body,
     render_data_quality_panel,
     render_future_features,
 )
+from src.ui.styles import apply_global_styles, render_hero, render_scenario_banner
 import src.logic.scoring as _scoring_module
 
 
@@ -84,171 +85,157 @@ def _load():
 # App
 # ---------------------------------------------------------------------------
 
-def main():
-    # --- Load data ---
-    city_data_base, quality_notes, from_workbook = _load()
+def _render_leader_strip(results):
+    """Top three cities as compact metrics."""
+    if not results:
+        return
+    n = min(3, len(results))
+    cols = st.columns(n)
+    medals = ("Leader", "2nd", "3rd")
+    for i, col in enumerate(cols):
+        r = results[i]
+        with col:
+            if i == 0:
+                st.metric(
+                    label=f"{medals[i]} · {r.city}",
+                    value=f"{r.total_score:.2f}",
+                    help="Highest weighted composite score.",
+                )
+            else:
+                gap = r.total_score - results[0].total_score
+                st.metric(
+                    label=f"{medals[i]} · {r.city}",
+                    value=f"{r.total_score:.2f}",
+                    delta=f"{gap:+.2f} vs leader",
+                    delta_color="inverse",
+                    help="Gap to first place.",
+                )
 
-    # --- Sidebar controls ---
+
+def main():
+    apply_global_styles()
+
+    city_data_base, quality_notes, from_workbook = _load()
     weights, scenario_name, drought_mode, future_climate_mode = render_sidebar()
 
-    # --- Apply scenario modifiers ---
     city_data = city_data_base
     if drought_mode:
         city_data = apply_drought_scenario(city_data)
     if future_climate_mode:
         city_data = apply_future_climate_scenario(city_data)
 
-    # --- Score & rank ---
     results = rank_cities(city_data, weights)
 
-    # --- Header ---
-    st.markdown(
-        """
-        <h1 style='margin-bottom:0'>🏗️ Siteworks</h1>
-        <p style='color:grey;font-size:1.1em;margin-top:4px'>
-        Data Center Site Selection Dashboard &nbsp;·&nbsp; CIVE-580
-        </p>
-        """,
-        unsafe_allow_html=True,
-    )
+    render_hero(from_workbook=from_workbook)
 
     if drought_mode or future_climate_mode:
-        active = []
+        pretty = []
         if drought_mode:
-            active.append("🌵 Drought Year")
+            pretty.append("Drought year (−20% water-related scores)")
         if future_climate_mode:
-            active.append("🌍 2050 Climate Shift")
-        st.warning(f"⚠️ Active scenario modifiers: {', '.join(active)}")
+            pretty.append("2050 climate shift")
+        render_scenario_banner(pretty)
 
-    # --- Tab navigation ---
-    tab_overview, tab_compare, tab_data, tab_about = st.tabs([
-        "📊 Rankings & Overview",
-        "🆚 Compare Cities",
-        "🔍 Data Explorer",
-        "ℹ️ About & Methodology",
-    ])
+    st.markdown("#### Snapshot")
+    _render_leader_strip(results)
 
-    # ==========================================================================
-    # TAB 1 – Overview
-    # ==========================================================================
+    tab_overview, tab_compare, tab_data, tab_about = st.tabs(
+        ["Overview", "Compare", "Data", "About"]
+    )
+
     with tab_overview:
-        st.markdown("### 🏆 City Rankings")
-        st.caption(
-            "Cities are ranked by their **weighted sustainability score** (1–5 scale). "
-            "Adjust weights in the sidebar to see how priorities change the ranking."
-        )
-
-        # Ranked table
-        render_ranking_table(results)
-
-        # Charts
-        col_left, col_right = st.columns([1, 1])
-        with col_left:
-            st.plotly_chart(total_score_bar(results), use_container_width=True)
-        with col_right:
-            st.plotly_chart(
-                radar_chart(results),
-                use_container_width=True,
+        with st.container(border=True):
+            st.markdown("##### Rankings")
+            st.caption(
+                "Weighted **1–5** composite (**5** = best for siting). "
+                "Adjust priorities in the sidebar to reshuffle results."
             )
+            render_ranking_table(results)
 
-        st.plotly_chart(
-            category_score_grouped_bar(results), use_container_width=True
-        )
+        c1, c2 = st.columns(2, gap="large")
+        with c1:
+            st.plotly_chart(total_score_bar(results), width="stretch")
+        with c2:
+            st.plotly_chart(radar_chart(results), width="stretch")
 
-        # Summary panel
+        st.plotly_chart(category_score_grouped_bar(results), width="stretch")
+
         render_summary_panel(results, scenario_name)
 
-        # Methodology explainers
-        render_scoring_explainer()
-        render_category_explainer()
+        with st.expander("How scoring works", expanded=False):
+            render_scoring_explainer_body()
 
-    # ==========================================================================
-    # TAB 2 – Compare Cities
-    # ==========================================================================
+        with st.expander("Category definitions", expanded=False):
+            render_category_explainer_body()
+
     with tab_compare:
-        st.markdown("### 🆚 City Comparison")
-        st.caption(
-            "Select any two cities to see a detailed side-by-side comparison "
-            "of their category and subcategory scores."
-        )
-        render_comparison_view(city_data, results)
+        with st.container(border=True):
+            st.markdown("##### Head-to-head")
+            st.caption(
+                "Pick two cities for category scores, deltas, and subcategory detail."
+            )
+            render_comparison_view(city_data, results)
 
-    # ==========================================================================
-    # TAB 3 – Data Explorer
-    # ==========================================================================
     with tab_data:
-        st.markdown("### 🔍 Data Explorer")
-        st.caption(
-            "Inspect the underlying subcategory scores for any city. "
-            "All scores are on a 1–5 scale (5 = best for data-center siting)."
-        )
+        with st.container(border=True):
+            st.markdown("##### Subcategory explorer")
+            st.caption(
+                "Raw **1–5** sub-scores and measurements. "
+                "**5** always means better for data-center siting."
+            )
 
-        selected_city = st.selectbox(
-            "Select a city to inspect",
-            options=list(city_data.keys()),
-            key="data_explorer_city",
-        )
+            selected_city = st.selectbox(
+                "City",
+                options=list(city_data.keys()),
+                key="data_explorer_city",
+            )
 
-        if selected_city:
-            cd = city_data[selected_city]
-            st.markdown(f"#### Subcategory scores for **{selected_city}**")
-            render_subcategory_table(selected_city, cd, _scoring_module)
+            if selected_city:
+                cd = city_data[selected_city]
+                st.markdown(f"**{selected_city}** — metric breakdown")
+                render_subcategory_table(selected_city, cd, _scoring_module)
 
         render_data_quality_panel(quality_notes, from_workbook)
         render_future_features()
 
-    # ==========================================================================
-    # TAB 4 – About
-    # ==========================================================================
     with tab_about:
-        st.markdown("### ℹ️ About Siteworks")
-        st.markdown(
-            """
-**Siteworks** is a weighted multi-criteria decision analysis (MCDA) dashboard 
-for data center site selection.  It was built as a class project for 
-**CIVE-580: Applying AI in Environmental Engineering**.
+        with st.container(border=True):
+            st.markdown("##### About Siteworks")
+            st.markdown(
+                """
+**Siteworks** is a weighted MCDA dashboard for **data center site selection**,
+built for **CIVE-580: Applying AI in Environmental Engineering**.
 
-#### Core question
-> *"Is this site sustainable, or will it run out of water in 10 years?"*
+**Driving question**  
+*Is this location sustainable — or will it face acute water or climate stress?*
 
-#### Five pilot cities
+**Pilot cities**  
 Oklahoma City · Boston · Denver · Houston · Gainesville
 
-#### Five sustainability categories
-| Category | Default Weight | Focus |
-|---|---|---|
-| Hydrological & Regulatory Risk | 25% | Water scarcity, precipitation, recycled water |
-| Climate & Operational Physics | 30% | Cooling efficiency, humidity, grid carbon |
-| Economic & Social Impact | 15% | Electricity rates, water costs, equity |
-| Natural Hazards | 20% | Flood, tornado, wildlife, winter weather |
-| Biodiversity | 10% | Protected land proximity |
+**Five themes**
 
-#### Scoring scale
-All metrics are scored **1 (worst) to 5 (best)** for data-center siting.
-Higher-risk metrics (e.g., tornado frequency, flood risk) are scored inversely.
+| Theme | Default weight | Focus |
+| --- | --- | --- |
+| Hydrological & Regulatory Risk | 25% | Water scarcity, precipitation, reuse |
+| Climate & Operational Physics | 30% | Cooling load, humidity, grid carbon |
+| Economic & Social Impact | 15% | Power rates, water cost, equity |
+| Natural Hazards | 20% | Flood, tornado, wildlife, winter |
+| Biodiversity | 10% | Protected-area constraints |
 
-#### How to use
-1. Use the **sidebar sliders** to adjust category weights for your priorities.
-2. Pick a **Scenario Preset** for quick what-if analysis.
-3. Use the **Compare Cities** tab to drill into two cities side by side.
-4. Use the **Data Explorer** tab to inspect underlying subcategory scores.
-5. Check the **Data Quality & Assumptions** panel for caveats.
+**Scale**  
+All metrics are **1 (worst) → 5 (best)** for siting. High *risk* metrics are inverted so **5** still means *better*.
 
-#### Limitations
-- Pilot dataset covers 5 cities only.
-- Scores are estimates based on public data; site-specific measurements may differ.
-- This is a decision-support prototype – not a substitute for professional engineering review.
+**How to use**  
+Use the sidebar weights and scenario toggles, compare two cities on **Compare**, and
+inspect drivers on **Data**.
 
-#### Source files
-| File | Role |
-|---|---|
-| `Data_Center_Site_Selector_RH.xlsx` | Primary scoring data (place in `/data/`) |
-| `CIVE580 Algorithms for AI.docx` | Scoring logic specification |
-| `Project_Roadmap.docx` | Feature roadmap |
-| `CIVE 580 Project MAA.xlsx` | Future-expansion template (not parsed) |
-| `Data-Center-Site-Selector-A-Vibe-Coding-Approach.pptx` | UX & product direction |
+**Limits**  
+Five-city pilot; public-data estimates; not a substitute for professional engineering.
+
+**Sources**  
+`Data_Center_Site_Selector_RH.xlsx` in `data/` · methodology docs in repo README.
 """
-        )
+            )
 
 
 if __name__ == "__main__":

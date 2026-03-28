@@ -29,15 +29,17 @@ def render_sidebar() -> Tuple[Dict[str, float], str, bool, bool]:
     Render the sidebar and return:
         (normalised_weights, scenario_name, drought_mode, future_climate_mode)
     """
-    st.sidebar.title("⚙️ Siteworks Controls")
+    st.sidebar.markdown("## Controls")
+    st.sidebar.caption("Weights & scenarios drive all rankings and charts.")
 
-    # --- Scenario preset ---
-    st.sidebar.markdown("### 🎯 Scenario Preset")
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### Preset")
     scenario_name = st.sidebar.selectbox(
-        "Apply a weight preset",
+        "Scenario",
         options=list(SCENARIO_WEIGHTS.keys()),
         index=0,
-        help="Choose a named scenario to auto-set the category weights below.",
+        label_visibility="collapsed",
+        help="Sets starting weights; you can still fine-tune sliders below.",
     )
     if scenario_name != "Default":
         st.sidebar.caption(SCENARIO_DESCRIPTIONS[scenario_name])
@@ -45,12 +47,9 @@ def render_sidebar() -> Tuple[Dict[str, float], str, bool, bool]:
     # Determine starting weights from scenario
     preset_weights = SCENARIO_WEIGHTS[scenario_name]
 
-    # --- Weight sliders ---
-    st.sidebar.markdown("### 🎚️ Category Weights")
-    st.sidebar.caption(
-        "Adjust how much each category counts toward the final score. "
-        "Weights are normalised automatically so they always sum to 1.0."
-    )
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### Category weights")
+    st.sidebar.caption("Normalized to sum to **1.0** automatically.")
 
     raw_weights: Dict[str, float] = {}
     for cat in CATEGORIES:
@@ -72,8 +71,7 @@ def render_sidebar() -> Tuple[Dict[str, float], str, bool, bool]:
         st.sidebar.error("All weights are zero – resetting to defaults.")
         norm_weights = reset_to_defaults()
 
-    # Show normalised values
-    with st.sidebar.expander("📊 Normalised weights (sum = 1.0)", expanded=False):
+    with st.sidebar.expander("Normalized % (detail)", expanded=False):
         for cat in CATEGORIES:
             pct = norm_weights.get(cat, 0.0) * 100
             st.caption(f"{_SHORT_LABELS.get(cat, cat)}: **{pct:.1f}%**")
@@ -84,13 +82,13 @@ def render_sidebar() -> Tuple[Dict[str, float], str, bool, bool]:
         for issue in issues:
             st.sidebar.warning(issue)
 
-    # Reset button
-    if st.sidebar.button("🔄 Reset to Defaults"):
+    if st.sidebar.button("Re-run app", use_container_width=True, help="Refresh after changing data files."):
+        st.cache_data.clear()
         st.rerun()
 
-    # --- Scenario toggles ---
-    st.sidebar.markdown("### 🔬 What-If Scenarios")
-    st.sidebar.caption("⚠️ Prototype features – adjustments are approximate.")
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### What-if modifiers")
+    st.sidebar.caption("Approximate sensitivity — not predictive models.")
     drought_mode = st.sidebar.checkbox(
         "🌵 Drought Year (–20% water scores)",
         value=False,
@@ -103,9 +101,6 @@ def render_sidebar() -> Tuple[Dict[str, float], str, bool, bool]:
     )
 
     st.sidebar.markdown("---")
-    st.sidebar.caption(
-        "Siteworks v1.0 · CIVE-580 · "
-        "Scores: 1 (worst) – 5 (best)"
-    )
+    st.sidebar.caption("Siteworks · CIVE-580 · Scale 1–5 (5 = best for siting)")
 
     return norm_weights, scenario_name, drought_mode, future_climate

@@ -29,19 +29,22 @@ def render_comparison_view(
     col1, col2 = st.columns(2)
     with col1:
         city_a = st.selectbox(
-            "City A", options=city_names, index=0, key="compare_a"
+            "First city",
+            options=city_names,
+            index=0,
+            key="compare_a",
         )
     with col2:
         default_b = city_names[1] if len(city_names) > 1 else city_names[0]
         city_b = st.selectbox(
-            "City B",
+            "Second city",
             options=city_names,
             index=city_names.index(default_b),
             key="compare_b",
         )
 
     if city_a == city_b:
-        st.warning("Please select two different cities to compare.")
+        st.warning("Choose two different cities to compare.")
         return
 
     # Retrieve results
@@ -49,12 +52,9 @@ def render_comparison_view(
     ra = result_map[city_a]
     rb = result_map[city_b]
 
-    # Summary text
-    st.markdown("#### 📝 Summary")
     st.info(city_comparison_summary(ra, rb))
 
-    # Metric cards
-    st.markdown("#### 🏆 Overall Score")
+    st.markdown("##### Composite score")
     m1, m2 = st.columns(2)
     with m1:
         delta_a = ra.total_score - rb.total_score
@@ -70,12 +70,10 @@ def render_comparison_view(
             delta=f"Rank #{rb.rank}",
         )
 
-    # Charts
-    st.plotly_chart(comparison_bar(ra, rb), use_container_width=True)
-    st.plotly_chart(delta_bar(ra, rb), use_container_width=True)
+    st.plotly_chart(comparison_bar(ra, rb), width="stretch")
+    st.plotly_chart(delta_bar(ra, rb), width="stretch")
 
-    # Strengths and weaknesses
-    st.markdown("#### 💪 Strengths & Weaknesses")
+    st.markdown("##### Relative strengths")
     s1, s2 = st.columns(2)
 
     with s1:
@@ -85,7 +83,7 @@ def render_comparison_view(
         _render_strengths_weaknesses(rb, ra, city_b)
 
     # Subcategory detail
-    with st.expander("🔍 Detailed Subcategory Comparison", expanded=False):
+    with st.expander("All subcategories (table)", expanded=False):
         _render_subcategory_comparison(
             city_a, city_b, city_data[city_a], city_data[city_b]
         )
@@ -105,7 +103,7 @@ def _render_strengths_weaknesses(
 
     st.markdown(f"**{label}**")
 
-    st.markdown("✅ *Advantages over opponent:*")
+    st.caption("Advantages vs opponent")
     adv = [(c, d) for c, d in sorted_cats if d > 0]
     if adv:
         for cat, diff in adv[:3]:
@@ -115,7 +113,7 @@ def _render_strengths_weaknesses(
     else:
         st.caption("No categories where this city leads.")
 
-    st.markdown("❌ *Disadvantages:*")
+    st.caption("Trailing categories")
     disadv = [(c, d) for c, d in sorted_cats if d < 0]
     if disadv:
         for cat, diff in reversed(disadv[-3:]):
@@ -156,4 +154,4 @@ def _render_subcategory_comparison(
             })
 
     df = pd.DataFrame(rows)
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(df, width="stretch", hide_index=True)

@@ -14,6 +14,13 @@ import plotly.graph_objects as go
 
 from src.data.schema import CATEGORIES, ScoringResult
 
+# City line colors (grouped bar / radar) — teal-forward, colorblind-friendly
+CITY_COLORWAY = ("#0d9488", "#0284c7", "#7c3aed", "#d97706", "#db2777", "#059669", "#4f46e5")
+
+_CHART_FONT = dict(family="'DM Sans', 'Segoe UI', sans-serif", size=13, color="#1e293b")
+_CHART_PAPER = "rgba(0,0,0,0)"
+_CHART_PLOT = "#f1f5f9"
+
 # Consistent colour scale for scores
 _COLOR_SCALE = [
     [0.0, "#d73027"],   # 1 – red
@@ -30,6 +37,23 @@ _CAT_SHORT: Dict[str, str] = {
     "Natural Hazards":                "Hazards",
     "Biodiversity":                   "Biodiversity",
 }
+
+
+def _base_layout(**kwargs) -> dict:
+    """Shared Plotly layout fragments."""
+    base = dict(
+        font=_CHART_FONT,
+        paper_bgcolor=_CHART_PAPER,
+        plot_bgcolor=_CHART_PLOT,
+        hoverlabel=dict(
+            bgcolor="#ffffff",
+            font_size=13,
+            font_family="'DM Sans', sans-serif",
+            bordercolor="#e2e8f0",
+        ),
+    )
+    base.update(kwargs)
+    return base
 
 
 def _score_colour(score: float, min_s: float = 1.0, max_s: float = 5.0) -> str:
@@ -64,12 +88,18 @@ def total_score_bar(results: List[ScoringResult]) -> go.Figure:
         )
     )
     fig.update_layout(
-        title="Overall Site Suitability Score (1–5)",
-        xaxis=dict(range=[0, 5.5], title="Weighted Score"),
-        yaxis=dict(categoryorder="total ascending"),
-        height=320,
-        margin=dict(l=10, r=60, t=50, b=30),
-        plot_bgcolor="white",
+        **_base_layout(
+            title=dict(text="Overall site suitability", font=dict(size=16)),
+            xaxis=dict(
+                range=[0, 5.5],
+                title="Weighted score (1–5)",
+                gridcolor="#e2e8f0",
+                zeroline=False,
+            ),
+            yaxis=dict(categoryorder="total ascending", title=""),
+            height=340,
+            margin=dict(l=8, r=72, t=56, b=36),
+        )
     )
     return fig
 
@@ -96,18 +126,35 @@ def category_score_grouped_bar(results: List[ScoringResult]) -> go.Figure:
         y="Score",
         color="City",
         barmode="group",
-        color_discrete_sequence=px.colors.qualitative.Set2,
-        title="Category Scores by City",
+        color_discrete_sequence=list(CITY_COLORWAY),
         text_auto=".2f",
     )
-    fig.update_layout(
-        yaxis=dict(range=[0, 5.5], title="Score"),
-        height=380,
-        margin=dict(l=10, r=10, t=50, b=80),
-        legend_title_text="City",
-        plot_bgcolor="white",
+    fig.for_each_trace(
+        lambda tr: tr.update(marker_line_width=0, marker_line_color="white")
     )
-    fig.update_traces(textposition="outside")
+    fig.update_layout(
+        **_base_layout(
+            title=dict(text="Scores by sustainability category", font=dict(size=16)),
+            yaxis=dict(
+                range=[0, 5.5],
+                title="Category average (1–5)",
+                gridcolor="#e2e8f0",
+                zeroline=False,
+            ),
+            xaxis=dict(title="", tickangle=-18),
+            height=420,
+            margin=dict(l=8, r=8, t=56, b=96),
+            legend_title_text="City",
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=-0.28,
+                xanchor="center",
+                x=0.5,
+            ),
+        )
+    )
+    fig.update_traces(textposition="outside", textfont_size=11)
     return fig
 
 
@@ -121,7 +168,7 @@ def radar_chart(results: List[ScoringResult], highlight: Optional[str] = None) -
     cats_closed = cats_short + [cats_short[0]]  # close the polygon
 
     fig = go.Figure()
-    colours = px.colors.qualitative.Set2
+    colours = list(CITY_COLORWAY)
 
     for idx, r in enumerate(results):
         values = [r.category_scores.get(c, 0.0) for c in CATEGORIES]
@@ -140,12 +187,28 @@ def radar_chart(results: List[ScoringResult], highlight: Optional[str] = None) -
         )
 
     fig.update_layout(
-        polar=dict(
-            radialaxis=dict(range=[0, 5], tickvals=[1, 2, 3, 4, 5]),
-        ),
-        title="Category Score Radar",
-        height=400,
-        showlegend=True,
+        **_base_layout(
+            polar=dict(
+                bgcolor=_CHART_PLOT,
+                radialaxis=dict(
+                    range=[0, 5],
+                    tickvals=[1, 2, 3, 4, 5],
+                    gridcolor="#e2e8f0",
+                    linecolor="#cbd5e1",
+                ),
+                angularaxis=dict(linecolor="#cbd5e1", gridcolor="#e2e8f0"),
+            ),
+            title=dict(text="Category profile (radar)", font=dict(size=16)),
+            height=420,
+            showlegend=True,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=-0.12,
+                xanchor="center",
+                x=0.5,
+            ),
+        )
     )
     return fig
 
@@ -167,7 +230,8 @@ def comparison_bar(a: ScoringResult, b: ScoringResult) -> go.Figure:
             y=cats_short,
             x=a_scores,
             orientation="h",
-            marker_color="#4C72B0",
+            marker_color=CITY_COLORWAY[0],
+            marker_line_width=0,
             text=[f"{s:.2f}" for s in a_scores],
             textposition="outside",
         )
@@ -178,20 +242,30 @@ def comparison_bar(a: ScoringResult, b: ScoringResult) -> go.Figure:
             y=cats_short,
             x=b_scores,
             orientation="h",
-            marker_color="#DD8452",
+            marker_color=CITY_COLORWAY[2],
+            marker_line_width=0,
             text=[f"{s:.2f}" for s in b_scores],
             textposition="outside",
         )
     )
     fig.update_layout(
-        barmode="group",
-        title=f"Category Comparison: {a.city} vs {b.city}",
-        xaxis=dict(range=[0, 5.8], title="Score"),
-        yaxis=dict(title=""),
-        height=360,
-        margin=dict(l=10, r=70, t=50, b=30),
-        plot_bgcolor="white",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        **_base_layout(
+            barmode="group",
+            title=dict(
+                text=f"{a.city} vs {b.city} — categories",
+                font=dict(size=16),
+            ),
+            xaxis=dict(
+                range=[0, 5.8],
+                title="Score (1–5)",
+                gridcolor="#e2e8f0",
+                zeroline=False,
+            ),
+            yaxis=dict(title=""),
+            height=380,
+            margin=dict(l=8, r=72, t=56, b=36),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        )
     )
     return fig
 
@@ -222,11 +296,21 @@ def delta_bar(a: ScoringResult, b: ScoringResult) -> go.Figure:
     )
     fig.add_vline(x=0, line_dash="dash", line_color="gray")
     fig.update_layout(
-        title=f"Score Difference: {a.city} (blue) minus {b.city} (orange)",
-        xaxis=dict(title="Δ Score", range=[-3, 3]),
-        yaxis=dict(title=""),
-        height=300,
-        margin=dict(l=10, r=70, t=50, b=30),
-        plot_bgcolor="white",
+        **_base_layout(
+            title=dict(
+                text=f"Gap: {a.city} − {b.city} (by category)",
+                font=dict(size=16),
+            ),
+            xaxis=dict(
+                title="Score difference",
+                range=[-3, 3],
+                gridcolor="#e2e8f0",
+                zeroline=True,
+                zerolinecolor="#94a3b8",
+            ),
+            yaxis=dict(title=""),
+            height=320,
+            margin=dict(l=8, r=72, t=56, b=36),
+        )
     )
     return fig
