@@ -74,7 +74,7 @@ def total_score_bar(results: List[ScoringResult]) -> go.Figure:
     cities = [r.city for r in results]
     scores = [r.total_score for r in results]
     colours = [_score_colour(s) for s in scores]
-    ranks = [r.rank for r in results]
+    avg_score = sum(scores) / len(scores) if scores else 0.0
 
     fig = go.Figure(
         go.Bar(
@@ -82,14 +82,21 @@ def total_score_bar(results: List[ScoringResult]) -> go.Figure:
             x=scores,
             orientation="h",
             marker_color=colours,
-            text=[f"#{rank}  {score:.2f}" for rank, score in zip(ranks, scores)],
+            text=[f"{score:.2f}" for score in scores],
             textposition="outside",
             hovertemplate="<b>%{y}</b><br>Score: %{x:.2f}<extra></extra>",
         )
     )
+    fig.add_vline(
+        x=avg_score,
+        line_dash="dot",
+        line_color="#64748b",
+        annotation_text=f"Avg {avg_score:.2f}",
+        annotation_position="top right",
+    )
     fig.update_layout(
         **_base_layout(
-            title=dict(text="Overall site suitability", font=dict(size=16)),
+            title=dict(text="Overall Score", font=dict(size=17)),
             xaxis=dict(
                 range=[0, 5.5],
                 title="Weighted score (1–5)",
@@ -108,7 +115,10 @@ def total_score_bar(results: List[ScoringResult]) -> go.Figure:
 # Grouped bar chart: category scores
 # ---------------------------------------------------------------------------
 
-def category_score_grouped_bar(results: List[ScoringResult]) -> go.Figure:
+def category_score_grouped_bar(
+    results: List[ScoringResult],
+    emphasis_cities: Optional[List[str]] = None,
+) -> go.Figure:
     """Grouped bar chart – one group per category, bars coloured by score."""
     rows = []
     for r in results:
@@ -132,25 +142,30 @@ def category_score_grouped_bar(results: List[ScoringResult]) -> go.Figure:
     fig.for_each_trace(
         lambda tr: tr.update(marker_line_width=0, marker_line_color="white")
     )
+    emphasis_set = set(emphasis_cities or [])
+    if emphasis_set:
+        fig.for_each_trace(
+            lambda tr: tr.update(opacity=1.0 if tr.name in emphasis_set else 0.35)
+        )
     fig.update_layout(
         **_base_layout(
-            title=dict(text="Scores by sustainability category", font=dict(size=16)),
+            title=dict(text="Category Comparison", font=dict(size=17)),
             yaxis=dict(
                 range=[0, 5.5],
                 title="Category average (1–5)",
-                gridcolor="#e2e8f0",
+                gridcolor="#cbd5e1",
                 zeroline=False,
             ),
-            xaxis=dict(title="", tickangle=-18),
+            xaxis=dict(title="", tickangle=-10, tickfont=dict(size=13)),
             height=420,
-            margin=dict(l=8, r=8, t=56, b=96),
+            margin=dict(l=8, r=8, t=78, b=96),
             legend_title_text="City",
             legend=dict(
                 orientation="h",
                 yanchor="bottom",
-                y=-0.28,
-                xanchor="center",
-                x=0.5,
+                y=1.03,
+                xanchor="right",
+                x=1.0,
             ),
         )
     )
@@ -164,6 +179,8 @@ def category_score_grouped_bar(results: List[ScoringResult]) -> go.Figure:
 
 def radar_chart(results: List[ScoringResult], highlight: Optional[str] = None) -> go.Figure:
     """Radar / spider chart of category scores per city."""
+    if not results:
+        return go.Figure()
     cats_short = [_CAT_SHORT.get(c, c) for c in CATEGORIES]
     cats_closed = cats_short + [cats_short[0]]  # close the polygon
 
@@ -198,7 +215,7 @@ def radar_chart(results: List[ScoringResult], highlight: Optional[str] = None) -
                 ),
                 angularaxis=dict(linecolor="#cbd5e1", gridcolor="#e2e8f0"),
             ),
-            title=dict(text="Category profile (radar)", font=dict(size=16)),
+            title=dict(text="Category Comparison (Radar)", font=dict(size=17)),
             height=420,
             showlegend=True,
             legend=dict(

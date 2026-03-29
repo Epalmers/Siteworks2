@@ -38,6 +38,7 @@ def render_sidebar() -> Tuple[Dict[str, float], str, bool, bool]:
         "Scenario",
         options=list(SCENARIO_WEIGHTS.keys()),
         index=0,
+        key="scenario_preset",
         label_visibility="collapsed",
         help="Sets starting weights; you can still fine-tune sliders below.",
     )
@@ -47,6 +48,20 @@ def render_sidebar() -> Tuple[Dict[str, float], str, bool, bool]:
     # Determine starting weights from scenario
     preset_weights = SCENARIO_WEIGHTS[scenario_name]
 
+    # Keep slider state in sync when preset changes.
+    if "_last_scenario_preset" not in st.session_state:
+        st.session_state["_last_scenario_preset"] = scenario_name
+        for cat in CATEGORIES:
+            st.session_state[f"weight_{cat}"] = float(
+                round(preset_weights.get(cat, DEFAULT_WEIGHTS[cat]), 2)
+            )
+    elif st.session_state["_last_scenario_preset"] != scenario_name:
+        st.session_state["_last_scenario_preset"] = scenario_name
+        for cat in CATEGORIES:
+            st.session_state[f"weight_{cat}"] = float(
+                round(preset_weights.get(cat, DEFAULT_WEIGHTS[cat]), 2)
+            )
+
     st.sidebar.markdown("---")
     st.sidebar.markdown("### Category weights")
     st.sidebar.caption("Normalized to sum to **1.0** automatically.")
@@ -54,13 +69,14 @@ def render_sidebar() -> Tuple[Dict[str, float], str, bool, bool]:
     raw_weights: Dict[str, float] = {}
     for cat in CATEGORIES:
         default_val = preset_weights.get(cat, DEFAULT_WEIGHTS[cat])
+        slider_key = f"weight_{cat}"
         raw_weights[cat] = st.sidebar.slider(
             label=_SHORT_LABELS.get(cat, cat),
             min_value=0.0,
             max_value=1.0,
-            value=float(round(default_val, 2)),
-            step=0.05,
-            key=f"weight_{cat}",
+            value=float(st.session_state.get(slider_key, round(default_val, 2))),
+            step=0.01,
+            key=slider_key,
             help=f"Raw weight for: {cat}",
         )
 
@@ -82,7 +98,21 @@ def render_sidebar() -> Tuple[Dict[str, float], str, bool, bool]:
         for issue in issues:
             st.sidebar.warning(issue)
 
-    if st.sidebar.button("Re-run app", use_container_width=True, help="Refresh after changing data files."):
+    c1, c2 = st.sidebar.columns(2)
+    if c1.button("Preset", use_container_width=True, help="Reset sliders to selected preset"):
+        for cat in CATEGORIES:
+            st.session_state[f"weight_{cat}"] = float(
+                round(preset_weights.get(cat, DEFAULT_WEIGHTS[cat]), 2)
+            )
+        st.rerun()
+    if c2.button("Default", use_container_width=True, help="Reset sliders to app defaults"):
+        st.session_state["scenario_preset"] = "Default"
+        st.session_state["_last_scenario_preset"] = "Default"
+        for cat in CATEGORIES:
+            st.session_state[f"weight_{cat}"] = float(round(DEFAULT_WEIGHTS[cat], 2))
+        st.rerun()
+
+    if st.sidebar.button("Refresh data", use_container_width=True, help="Clear cached workbook and re-read files"):
         st.cache_data.clear()
         st.rerun()
 

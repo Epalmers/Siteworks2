@@ -57,7 +57,6 @@ def render_comparison_view(
     st.markdown("##### Composite score")
     m1, m2 = st.columns(2)
     with m1:
-        delta_a = ra.total_score - rb.total_score
         st.metric(
             label=city_a,
             value=f"{ra.total_score:.2f}",

@@ -2,7 +2,7 @@
 explainers.py – Tooltips, plain-language panels, and data transparency views.
 """
 
-from typing import Dict, List
+from typing import List
 
 import streamlit as st
 
@@ -12,11 +12,9 @@ from src.data.schema import (
     SUBCATEGORY_TOOLTIPS,
     SUBCATEGORY_SOURCES,
     DEFAULT_WEIGHTS,
-    CityData,
     ScoringResult,
 )
 from src.logic.summaries import top_city_summary, bottom_city_summary, scenario_summary
-from src.data.loader import DATA_QUALITY_NOTES
 
 
 def render_summary_panel(

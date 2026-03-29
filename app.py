@@ -86,30 +86,34 @@ def _load():
 # ---------------------------------------------------------------------------
 
 def _render_leader_strip(results):
-    """Top three cities as compact metrics."""
+    """Render top-3 ranking cards with clear visual hierarchy."""
     if not results:
         return
-    n = min(3, len(results))
-    cols = st.columns(n)
-    medals = ("Leader", "2nd", "3rd")
-    for i, col in enumerate(cols):
-        r = results[i]
-        with col:
-            if i == 0:
-                st.metric(
-                    label=f"{medals[i]} · {r.city}",
-                    value=f"{r.total_score:.2f}",
-                    help="Highest weighted composite score.",
-                )
-            else:
-                gap = r.total_score - results[0].total_score
-                st.metric(
-                    label=f"{medals[i]} · {r.city}",
-                    value=f"{r.total_score:.2f}",
-                    delta=f"{gap:+.2f} vs leader",
-                    delta_color="inverse",
-                    help="Gap to first place.",
-                )
+    cards = []
+    top = results[: min(3, len(results))]
+    for i, r in enumerate(top):
+        role = "Leader" if i == 0 else ("2nd" if i == 1 else "3rd")
+        if i == 0:
+            sub = "Leading score"
+            klass = "is-leader"
+        else:
+            gap = results[0].total_score - r.total_score
+            sub = f"{gap:.2f} behind leader"
+            klass = "is-secondary"
+        cards.append(
+            (
+                f'<div class="sw-snapshot-card {klass}">'
+                f'<p class="sw-snapshot-role">{role}</p>'
+                f'<p class="sw-snapshot-city">{r.city}</p>'
+                f'<p class="sw-snapshot-score">{r.total_score:.2f}</p>'
+                f'<p class="sw-snapshot-sub">{sub}</p>'
+                "</div>"
+            )
+        )
+    st.markdown(
+        f'<div class="sw-snapshot-grid">{"".join(cards)}</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def main():
@@ -125,6 +129,9 @@ def main():
         city_data = apply_future_climate_scenario(city_data)
 
     results = rank_cities(city_data, weights)
+    if not results:
+        st.error("No ranking results available. Check input data and refresh.")
+        return
 
     render_hero(from_workbook=from_workbook)
 
@@ -138,6 +145,7 @@ def main():
 
     st.markdown("#### Snapshot")
     _render_leader_strip(results)
+    st.markdown("<div class='sw-spacer'></div>", unsafe_allow_html=True)
 
     tab_overview, tab_compare, tab_data, tab_about = st.tabs(
         ["Overview", "Compare", "Data", "About"]
@@ -151,14 +159,33 @@ def main():
                 "Adjust priorities in the sidebar to reshuffle results."
             )
             render_ranking_table(results)
+        st.markdown("<div class='sw-spacer'></div>", unsafe_allow_html=True)
 
         c1, c2 = st.columns(2, gap="large")
         with c1:
             st.plotly_chart(total_score_bar(results), width="stretch")
         with c2:
-            st.plotly_chart(radar_chart(results), width="stretch")
+            city_options = [r.city for r in results]
+            default_cities = city_options[: min(3, len(city_options))]
+            selected_cities = st.multiselect(
+                "Compare cities",
+                options=city_options,
+                default=default_cities,
+                max_selections=3,
+                key="radar_compare_cities",
+                help="Select up to 3 cities. Remove chips to adjust comparison.",
+            )
+            if not selected_cities:
+                st.info("Select at least one city to show category comparison.")
+            else:
+                selected_results = [r for r in results if r.city in selected_cities]
+                st.plotly_chart(radar_chart(selected_results), width="stretch")
 
-        st.plotly_chart(category_score_grouped_bar(results), width="stretch")
+        st.markdown("<div class='sw-spacer'></div>", unsafe_allow_html=True)
+        st.plotly_chart(
+            category_score_grouped_bar(results, emphasis_cities=selected_cities if selected_cities else None),
+            width="stretch",
+        )
 
         render_summary_panel(results, scenario_name)
 

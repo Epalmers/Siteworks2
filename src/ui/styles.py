@@ -26,7 +26,7 @@ def apply_global_styles() -> None:
 
     /* Main content width & breathing room */
     .block-container {
-        padding-top: 1.75rem;
+        padding-top: 1.2rem;
         padding-bottom: 4rem;
         max-width: 1280px;
     }
@@ -36,8 +36,8 @@ def apply_global_styles() -> None:
         background: linear-gradient(135deg, #f0fdfa 0%, #f8fafc 45%, #ecfeff 100%);
         border: 1px solid #ccfbf1;
         border-radius: 16px;
-        padding: 1.5rem 1.75rem 1.35rem 1.75rem;
-        margin-bottom: 1.5rem;
+        padding: 1.05rem 1.35rem 0.9rem 1.35rem;
+        margin-bottom: 1rem;
         box-shadow: 0 4px 24px -8px rgba(15, 118, 110, 0.15);
     }
     div.sw-hero h1 {
@@ -49,16 +49,16 @@ def apply_global_styles() -> None:
         background-clip: text;
     }
     div.sw-hero .sw-tagline {
-        color: #475569;
-        font-size: 1.05rem;
+        color: #334155;
+        font-size: 1rem;
         margin: 0;
         font-weight: 500;
     }
     div.sw-hero .sw-badge-row {
-        margin-top: 1rem;
+        margin-top: 0.58rem;
         display: flex;
         flex-wrap: wrap;
-        gap: 0.5rem;
+        gap: 0.35rem;
         align-items: center;
     }
     span.sw-badge {
@@ -144,7 +144,69 @@ def apply_global_styles() -> None:
 
     /* Reduce noisy caption size in main */
     .stMain .stCaption {
-        color: #64748b !important;
+        color: #475569 !important;
+    }
+    .stMain h4 {
+        margin-top: 0.3rem;
+        font-size: 1.24rem !important;
+    }
+    .stMain h5 {
+        font-size: 1.07rem !important;
+        color: #0f172a !important;
+    }
+
+    /* Section spacing rhythm */
+    .sw-spacer {
+        height: 0.9rem;
+    }
+
+    /* Snapshot cards */
+    .sw-snapshot-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.75rem;
+        margin: 0.5rem 0 0.9rem 0;
+    }
+    .sw-snapshot-card {
+        border-radius: 14px;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        padding: 0.9rem 1rem;
+    }
+    .sw-snapshot-card.is-leader {
+        border-color: #99f6e4;
+        box-shadow: 0 12px 30px -17px rgba(13, 148, 136, 0.5);
+        background: linear-gradient(135deg, #ecfeff 0%, #ffffff 80%);
+    }
+    .sw-snapshot-card.is-secondary {
+        background: #f8fafc;
+        opacity: 0.95;
+    }
+    .sw-snapshot-role {
+        margin: 0;
+        font-size: 0.78rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #64748b;
+        font-weight: 700;
+    }
+    .sw-snapshot-city {
+        margin: 0.1rem 0 0 0;
+        font-size: 1.01rem;
+        color: #0f172a;
+        font-weight: 600;
+    }
+    .sw-snapshot-score {
+        margin: 0.2rem 0 0.05rem 0;
+        font-size: 1.84rem;
+        line-height: 1.08;
+        color: #0f172a;
+        font-weight: 700;
+    }
+    .sw-snapshot-sub {
+        margin: 0;
+        font-size: 0.84rem;
+        color: #64748b;
     }
 </style>
         """,

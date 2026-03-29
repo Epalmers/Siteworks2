@@ -45,7 +45,14 @@ def render_ranking_table(results: List[ScoringResult]) -> None:
             vmax=5.0,
         )
         .format({col: "{:.2f}" for col in score_cols})
-        .set_properties(**{"text-align": "center"})
+        .set_properties(
+            subset=score_cols,
+            **{"text-align": "right", "color": "#0f172a", "font-weight": "600"},
+        )
+        .set_properties(
+            subset=["Rank", "City"],
+            **{"text-align": "left", "color": "#0f172a"},
+        )
     )
 
     st.dataframe(styled, width="stretch", hide_index=True)
