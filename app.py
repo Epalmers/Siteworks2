@@ -58,6 +58,7 @@ from src.ui.charts import (
     total_score_bar,
     category_score_grouped_bar,
     radar_chart,
+    city_color,
 )
 from src.ui.tables import render_ranking_table, render_subcategory_table
 from src.ui.compare import render_comparison_view
@@ -68,7 +69,12 @@ from src.ui.explainers import (
     render_data_quality_panel,
     render_future_features,
 )
-from src.ui.styles import apply_global_styles, render_hero, render_scenario_banner
+from src.ui.styles import (
+    apply_global_styles,
+    render_hero,
+    render_scenario_banner,
+    render_kpi_strip,
+)
 import src.logic.scoring as _scoring_module
 
 
@@ -94,17 +100,19 @@ def _render_leader_strip(results):
     for i, r in enumerate(top):
         role = "Leader" if i == 0 else ("2nd" if i == 1 else "3rd")
         if i == 0:
-            sub = "Leading score"
+            avg = sum(x.total_score for x in results) / len(results)
+            sub = f"+{(r.total_score - avg):.2f} above average"
             klass = "is-leader"
         else:
-            gap = results[0].total_score - r.total_score
-            sub = f"{gap:.2f} behind leader"
+            avg = sum(x.total_score for x in results) / len(results)
+            sub = f"{(r.total_score - avg):+.2f} vs average"
             klass = "is-secondary"
+        dot = city_color(r.city)
         cards.append(
             (
                 f'<div class="sw-snapshot-card {klass}">'
                 f'<p class="sw-snapshot-role">{role}</p>'
-                f'<p class="sw-snapshot-city">{r.city}</p>'
+                f'<p class="sw-snapshot-city"><span class="sw-city-dot" style="background:{dot};"></span>{r.city}</p>'
                 f'<p class="sw-snapshot-score">{r.total_score:.2f}</p>'
                 f'<p class="sw-snapshot-sub">{sub}</p>'
                 "</div>"
@@ -114,6 +122,125 @@ def _render_leader_strip(results):
         f'<div class="sw-snapshot-grid">{"".join(cards)}</div>',
         unsafe_allow_html=True,
     )
+
+
+def _render_top_summary(results, from_workbook, drought_mode, future_climate_mode):
+    """Render hero, KPI strip, and snapshot row."""
+    render_hero(from_workbook=from_workbook)
+    top = results[0]
+    runner_up = results[1] if len(results) > 1 else None
+    spread = top.total_score - results[-1].total_score if len(results) > 1 else 0.0
+    gap_to_second = (top.total_score - runner_up.total_score) if runner_up else 0.0
+    active_mods = int(drought_mode) + int(future_climate_mode)
+    render_kpi_strip(
+        [
+            {
+                "label": "Top Ranked City",
+                "value": top.city,
+                "sub": f"Score {top.total_score:.2f}",
+            },
+            {
+                "label": "Leader Margin",
+                "value": f"{gap_to_second:+.2f}",
+                "sub": "vs second-ranked city",
+            },
+            {
+                "label": "Score Spread",
+                "value": f"{spread:.2f}",
+                "sub": "best to worst",
+            },
+            {
+                "label": "Active Modifiers",
+                "value": str(active_mods),
+                "sub": "what-if scenarios enabled",
+            },
+        ]
+    )
+
+    if drought_mode or future_climate_mode:
+        pretty = []
+        if drought_mode:
+            pretty.append("Drought year (−20% water-related scores)")
+        if future_climate_mode:
+            pretty.append("2050 climate shift")
+        render_scenario_banner(pretty)
+
+    st.markdown("#### Snapshot")
+    _render_leader_strip(results)
+    st.markdown("<div class='sw-spacer'></div>", unsafe_allow_html=True)
+    st.markdown("<div class='sw-spacer'></div>", unsafe_allow_html=True)
+
+
+def _render_overview_tab(results, scenario_name):
+    """Render summary -> comparison -> breakdown -> interpretation flow."""
+    with st.container(border=True):
+        st.markdown("##### Rankings")
+        st.caption(
+            "Weighted composite score (**1–5**, where **5** is most suitable). "
+            "Adjust priorities in the sidebar to update the ranking in real time."
+        )
+        render_ranking_table(results)
+
+    st.markdown("<div class='sw-spacer'></div>", unsafe_allow_html=True)
+    city_options = [r.city for r in results]
+    default_cities = city_options[: min(3, len(city_options))]
+
+    # Row 2: Overall score + Radar (side-by-side)
+    c_left, c_right = st.columns(2, gap="large")
+    with c_left:
+        with st.container(border=True):
+            st.markdown("##### Overall Score")
+            st.plotly_chart(total_score_bar(results), width="stretch")
+
+    with c_right:
+        with st.container(border=True):
+            st.markdown("##### Category Profile (Radar)")
+            radar_cities = st.multiselect(
+                "Radar Cities",
+                options=city_options,
+                default=default_cities,
+                max_selections=3,
+                key="radar_panel_cities",
+                help="Select 2-3 cities to compare category profiles.",
+            )
+            if len(radar_cities) < 2:
+                st.info("Select at least 2 cities to render the radar comparison.")
+            else:
+                selected_results = [r for r in results if r.city in radar_cities]
+                st.plotly_chart(radar_chart(selected_results), width="stretch")
+
+    # Row 3: Full-width grouped category comparison
+    st.markdown("<div class='sw-spacer'></div>", unsafe_allow_html=True)
+    with st.container(border=True):
+        c_title, c_control = st.columns([2.2, 1.3], gap="small")
+        c_title.markdown("##### Category Comparison")
+        with c_control:
+            selected_cities = st.multiselect(
+                "Focus Cities",
+                options=city_options,
+                default=default_cities,
+                max_selections=3,
+                key="radar_compare_cities",
+                help="Select up to 3 cities to emphasize in this chart.",
+                label_visibility="collapsed",
+                placeholder="Focus cities",
+            )
+        st.plotly_chart(
+            category_score_grouped_bar(
+                results,
+                emphasis_cities=selected_cities if len(selected_cities) >= 2 else None,
+            ),
+            width="stretch",
+        )
+
+    st.markdown("<div class='sw-spacer'></div>", unsafe_allow_html=True)
+    render_summary_panel(results, scenario_name)
+
+    with st.expander("How scoring works", expanded=False):
+        render_scoring_explainer_body()
+
+    with st.expander("Category definitions", expanded=False):
+        render_category_explainer_body()
 
 
 def main():
@@ -133,71 +260,18 @@ def main():
         st.error("No ranking results available. Check input data and refresh.")
         return
 
-    render_hero(from_workbook=from_workbook)
-
-    if drought_mode or future_climate_mode:
-        pretty = []
-        if drought_mode:
-            pretty.append("Drought year (−20% water-related scores)")
-        if future_climate_mode:
-            pretty.append("2050 climate shift")
-        render_scenario_banner(pretty)
-
-    st.markdown("#### Snapshot")
-    _render_leader_strip(results)
-    st.markdown("<div class='sw-spacer'></div>", unsafe_allow_html=True)
+    _render_top_summary(results, from_workbook, drought_mode, future_climate_mode)
 
     tab_overview, tab_compare, tab_data, tab_about = st.tabs(
         ["Overview", "Compare", "Data", "About"]
     )
 
     with tab_overview:
-        with st.container(border=True):
-            st.markdown("##### Rankings")
-            st.caption(
-                "Weighted **1–5** composite (**5** = best for siting). "
-                "Adjust priorities in the sidebar to reshuffle results."
-            )
-            render_ranking_table(results)
-        st.markdown("<div class='sw-spacer'></div>", unsafe_allow_html=True)
-
-        c1, c2 = st.columns(2, gap="large")
-        with c1:
-            st.plotly_chart(total_score_bar(results), width="stretch")
-        with c2:
-            city_options = [r.city for r in results]
-            default_cities = city_options[: min(3, len(city_options))]
-            selected_cities = st.multiselect(
-                "Compare cities",
-                options=city_options,
-                default=default_cities,
-                max_selections=3,
-                key="radar_compare_cities",
-                help="Select up to 3 cities. Remove chips to adjust comparison.",
-            )
-            if not selected_cities:
-                st.info("Select at least one city to show category comparison.")
-            else:
-                selected_results = [r for r in results if r.city in selected_cities]
-                st.plotly_chart(radar_chart(selected_results), width="stretch")
-
-        st.markdown("<div class='sw-spacer'></div>", unsafe_allow_html=True)
-        st.plotly_chart(
-            category_score_grouped_bar(results, emphasis_cities=selected_cities if selected_cities else None),
-            width="stretch",
-        )
-
-        render_summary_panel(results, scenario_name)
-
-        with st.expander("How scoring works", expanded=False):
-            render_scoring_explainer_body()
-
-        with st.expander("Category definitions", expanded=False):
-            render_category_explainer_body()
+        _render_overview_tab(results, scenario_name)
 
     with tab_compare:
         with st.container(border=True):
-            st.markdown("##### Head-to-head")
+            st.markdown("##### Head-to-Head Comparison")
             st.caption(
                 "Pick two cities for category scores, deltas, and subcategory detail."
             )
@@ -205,7 +279,7 @@ def main():
 
     with tab_data:
         with st.container(border=True):
-            st.markdown("##### Subcategory explorer")
+            st.markdown("##### Subcategory Explorer")
             st.caption(
                 "Raw **1–5** sub-scores and measurements. "
                 "**5** always means better for data-center siting."

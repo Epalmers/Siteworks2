@@ -105,7 +105,10 @@ def _find_sheet(wb):
 
 def _sheet_looks_long_format(sheet) -> bool:
     """True if row 5 looks like the tidy layout (Sub-Account, City, Score columns)."""
-    row5 = list(sheet.iter_rows(min_row=5, max_row=5, values_only=True))[0]
+    row5_rows = list(sheet.iter_rows(min_row=5, max_row=5, values_only=True))
+    if not row5_rows:
+        return False
+    row5 = row5_rows[0]
     if not row5 or len(row5) < 7:
         return False
     joined = " ".join(
@@ -119,8 +122,12 @@ def _city_nums_from_assignment_header(sheet) -> Dict[int, str]:
     Build city index → display name from rows 2–3 (numbered columns under
     'City Assignments' in the RH workbook).
     """
-    r2 = list(sheet.iter_rows(min_row=2, max_row=2, values_only=True))[0]
-    r3 = list(sheet.iter_rows(min_row=3, max_row=3, values_only=True))[0]
+    r2_rows = list(sheet.iter_rows(min_row=2, max_row=2, values_only=True))
+    r3_rows = list(sheet.iter_rows(min_row=3, max_row=3, values_only=True))
+    if not r2_rows or not r3_rows:
+        return {}
+    r2 = r2_rows[0]
+    r3 = r3_rows[0]
     out: Dict[int, str] = {}
     for i, h in enumerate(r2):
         if h is None:

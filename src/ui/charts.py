@@ -14,8 +14,19 @@ import plotly.graph_objects as go
 
 from src.data.schema import CATEGORIES, ScoringResult
 
-# City line colors (grouped bar / radar) — teal-forward, colorblind-friendly
-CITY_COLORWAY = ("#0d9488", "#0284c7", "#7c3aed", "#d97706", "#db2777", "#059669", "#4f46e5")
+# Fixed city color system used across charts/UI.
+CITY_COLORS: Dict[str, str] = {
+    "Denver": "#4f8f74",
+    "Oklahoma City": "#587db7",
+    "Boston": "#7f6aa8",
+    "Gainesville": "#b28f73",
+    "Houston": "#b86b7e",
+}
+
+
+def city_color(city: str) -> str:
+    """Return the canonical color for a city."""
+    return CITY_COLORS.get(city, "#334155")
 
 _CHART_FONT = dict(family="'DM Sans', 'Segoe UI', sans-serif", size=13, color="#1e293b")
 _CHART_PAPER = "rgba(0,0,0,0)"
@@ -23,11 +34,11 @@ _CHART_PLOT = "#f1f5f9"
 
 # Consistent colour scale for scores
 _COLOR_SCALE = [
-    [0.0, "#d73027"],   # 1 – red
-    [0.25, "#fc8d59"],
-    [0.5, "#fee08b"],   # 3 – yellow
-    [0.75, "#91cf60"],
-    [1.0, "#1a9850"],   # 5 – green
+    [0.0, "#bf6864"],
+    [0.25, "#d8af8c"],
+    [0.5, "#e4dab8"],
+    [0.75, "#a5c3a3"],
+    [1.0, "#648f75"],
 ]
 
 _CAT_SHORT: Dict[str, str] = {
@@ -45,6 +56,7 @@ def _base_layout(**kwargs) -> dict:
         font=_CHART_FONT,
         paper_bgcolor=_CHART_PAPER,
         plot_bgcolor=_CHART_PLOT,
+        margin=dict(l=8, r=16, t=56, b=36),
         hoverlabel=dict(
             bgcolor="#ffffff",
             font_size=13,
@@ -73,7 +85,7 @@ def total_score_bar(results: List[ScoringResult]) -> go.Figure:
     """Horizontal bar chart of total weighted scores for all cities."""
     cities = [r.city for r in results]
     scores = [r.total_score for r in results]
-    colours = [_score_colour(s) for s in scores]
+    colours = [city_color(c) for c in cities]
     avg_score = sum(scores) / len(scores) if scores else 0.0
 
     fig = go.Figure(
@@ -82,6 +94,8 @@ def total_score_bar(results: List[ScoringResult]) -> go.Figure:
             x=scores,
             orientation="h",
             marker_color=colours,
+            marker_line_color="#dce6f2",
+            marker_line_width=0.6,
             text=[f"{score:.2f}" for score in scores],
             textposition="outside",
             hovertemplate="<b>%{y}</b><br>Score: %{x:.2f}<extra></extra>",
@@ -90,24 +104,29 @@ def total_score_bar(results: List[ScoringResult]) -> go.Figure:
     fig.add_vline(
         x=avg_score,
         line_dash="dot",
-        line_color="#64748b",
-        annotation_text=f"Avg {avg_score:.2f}",
+        line_color="#51667f",
+        line_width=1.5,
+        annotation_text=f"Average {avg_score:.2f}",
         annotation_position="top right",
+        annotation_font_color="#1e293b",
     )
     fig.update_layout(
         **_base_layout(
-            title=dict(text="Overall Score", font=dict(size=17)),
+            title=dict(text="Overall Score", font=dict(size=16)),
             xaxis=dict(
                 range=[0, 5.5],
                 title="Weighted score (1–5)",
-                gridcolor="#e2e8f0",
+                gridcolor="#d8e1ec",
                 zeroline=False,
+                tickfont=dict(size=12.5),
             ),
-            yaxis=dict(categoryorder="total ascending", title=""),
-            height=340,
-            margin=dict(l=8, r=72, t=56, b=36),
+            yaxis=dict(title="", autorange="reversed", tickfont=dict(size=13.5)),
+            height=430,
+            bargap=0.08,
+            margin=dict(l=8, r=56, t=56, b=36),
         )
     )
+    fig.update_traces(marker_line_width=0, cliponaxis=False)
     return fig
 
 
@@ -130,13 +149,15 @@ def category_score_grouped_bar(
             })
     df = pd.DataFrame(rows)
 
+    city_order = [r.city for r in results]
     fig = px.bar(
         df,
         x="Category",
         y="Score",
         color="City",
         barmode="group",
-        color_discrete_sequence=list(CITY_COLORWAY),
+        color_discrete_map={**CITY_COLORS},
+        category_orders={"City": city_order},
         text_auto=".2f",
     )
     fig.for_each_trace(
@@ -149,27 +170,30 @@ def category_score_grouped_bar(
         )
     fig.update_layout(
         **_base_layout(
-            title=dict(text="Category Comparison", font=dict(size=17)),
+            title=dict(text="Category Comparison", font=dict(size=16)),
             yaxis=dict(
                 range=[0, 5.5],
                 title="Category average (1–5)",
-                gridcolor="#cbd5e1",
+                gridcolor="#d2dbe8",
                 zeroline=False,
+                tickfont=dict(size=12.5),
             ),
-            xaxis=dict(title="", tickangle=-10, tickfont=dict(size=13)),
-            height=420,
-            margin=dict(l=8, r=8, t=78, b=96),
+            xaxis=dict(title="", tickangle=-6, tickfont=dict(size=13)),
+            height=440,
+            margin=dict(l=8, r=12, t=76, b=90),
+            bargap=0.35,
+            bargroupgap=0.12,
             legend_title_text="City",
             legend=dict(
                 orientation="h",
                 yanchor="bottom",
-                y=1.03,
+                y=1.02,
                 xanchor="right",
                 x=1.0,
             ),
         )
     )
-    fig.update_traces(textposition="outside", textfont_size=11)
+    fig.update_traces(textposition="outside", textfont_size=10.5, cliponaxis=False)
     return fig
 
 
@@ -185,12 +209,11 @@ def radar_chart(results: List[ScoringResult], highlight: Optional[str] = None) -
     cats_closed = cats_short + [cats_short[0]]  # close the polygon
 
     fig = go.Figure()
-    colours = list(CITY_COLORWAY)
-
-    for idx, r in enumerate(results):
+    for _, r in enumerate(results):
         values = [r.category_scores.get(c, 0.0) for c in CATEGORIES]
         values_closed = values + [values[0]]
-        opacity = 1.0 if (highlight is None or r.city == highlight) else 0.25
+        is_focus = highlight is None or r.city == highlight
+        opacity = 0.48 if is_focus else 0.14
 
         fig.add_trace(
             go.Scatterpolar(
@@ -198,8 +221,11 @@ def radar_chart(results: List[ScoringResult], highlight: Optional[str] = None) -
                 theta=cats_closed,
                 fill="toself",
                 name=r.city,
-                line_color=colours[idx % len(colours)],
+                line_color=city_color(r.city),
+                line=dict(width=2.8 if is_focus else 2.0),
+                fillcolor=city_color(r.city),
                 opacity=opacity,
+                hovertemplate="<b>%{fullData.name}</b><br>%{theta}: %{r:.2f}<extra></extra>",
             )
         )
 
@@ -210,20 +236,25 @@ def radar_chart(results: List[ScoringResult], highlight: Optional[str] = None) -
                 radialaxis=dict(
                     range=[0, 5],
                     tickvals=[1, 2, 3, 4, 5],
-                    gridcolor="#e2e8f0",
-                    linecolor="#cbd5e1",
+                    tickfont=dict(size=11.5, color="#334155"),
+                    gridcolor="#dbe3ee",
+                    linecolor="#c6d3e2",
                 ),
-                angularaxis=dict(linecolor="#cbd5e1", gridcolor="#e2e8f0"),
+                angularaxis=dict(
+                    linecolor="#c6d3e2",
+                    gridcolor="#dbe3ee",
+                    tickfont=dict(size=12.5, color="#334155"),
+                ),
             ),
-            title=dict(text="Category Comparison (Radar)", font=dict(size=17)),
-            height=420,
+            title=dict(text="Category Profile (Radar)", font=dict(size=16)),
+            height=460,
             showlegend=True,
             legend=dict(
                 orientation="h",
                 yanchor="bottom",
-                y=-0.12,
-                xanchor="center",
-                x=0.5,
+                y=1.01,
+                xanchor="right",
+                x=1.0,
             ),
         )
     )
@@ -247,7 +278,7 @@ def comparison_bar(a: ScoringResult, b: ScoringResult) -> go.Figure:
             y=cats_short,
             x=a_scores,
             orientation="h",
-            marker_color=CITY_COLORWAY[0],
+            marker_color=city_color(a.city),
             marker_line_width=0,
             text=[f"{s:.2f}" for s in a_scores],
             textposition="outside",
@@ -259,7 +290,7 @@ def comparison_bar(a: ScoringResult, b: ScoringResult) -> go.Figure:
             y=cats_short,
             x=b_scores,
             orientation="h",
-            marker_color=CITY_COLORWAY[2],
+            marker_color=city_color(b.city),
             marker_line_width=0,
             text=[f"{s:.2f}" for s in b_scores],
             textposition="outside",

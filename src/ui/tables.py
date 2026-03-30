@@ -6,6 +6,7 @@ from typing import Dict, List
 
 import pandas as pd
 import streamlit as st
+from matplotlib.colors import LinearSegmentedColormap
 
 from src.data.schema import CATEGORIES, ScoringResult
 
@@ -16,6 +17,11 @@ _CAT_SHORT: Dict[str, str] = {
     "Natural Hazards":                "Hazards",
     "Biodiversity":                   "Biodiversity",
 }
+
+_TABLE_CMAP = LinearSegmentedColormap.from_list(
+    "siteworks_scores",
+    ["#be6863", "#d8b08d", "#e4dcbe", "#a8c3a4", "#688f76"],
+)
 
 
 def render_ranking_table(results: List[ScoringResult]) -> None:
@@ -40,22 +46,51 @@ def render_ranking_table(results: List[ScoringResult]) -> None:
         df.style
         .background_gradient(
             subset=score_cols,
-            cmap="RdYlGn",
+            cmap=_TABLE_CMAP,
             vmin=1.0,
             vmax=5.0,
         )
         .format({col: "{:.2f}" for col in score_cols})
+        .set_table_styles(
+            [
+                {
+                    "selector": "th",
+                    "props": [
+                        ("background-color", "#f2f6fb"),
+                        ("color", "#0f172a"),
+                        ("font-weight", "700"),
+                        ("font-size", "0.9rem"),
+                        ("border-bottom", "1px solid #c8d5e5"),
+                        ("text-align", "left"),
+                    ],
+                },
+                {
+                    "selector": "td",
+                    "props": [
+                        ("border-bottom", "1px solid #e7edf5"),
+                    ],
+                },
+            ]
+        )
         .set_properties(
             subset=score_cols,
-            **{"text-align": "right", "color": "#0f172a", "font-weight": "600"},
+            **{"text-align": "right", "color": "#0f172a", "font-weight": "700"},
         )
         .set_properties(
             subset=["Rank", "City"],
-            **{"text-align": "left", "color": "#0f172a"},
+            **{"text-align": "left", "color": "#0f172a", "font-weight": "600"},
+        )
+        .set_properties(
+            subset=["Rank"],
+            **{"background-color": "#edf3fb", "font-weight": "700"},
+        )
+        .set_properties(
+            subset=["Total Score"],
+            **{"font-size": "1.02rem", "font-weight": "800"},
         )
     )
 
-    st.dataframe(styled, width="stretch", hide_index=True)
+    st.dataframe(styled, width="stretch", hide_index=True, row_height=42)
 
 
 def render_subcategory_table(
@@ -100,4 +135,5 @@ def render_subcategory_table(
         df_display[["Category", "Subcategory", "Score", "Raw Value", "Description"]],
         width="stretch",
         hide_index=True,
+        row_height=36,
     )

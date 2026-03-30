@@ -17,6 +17,15 @@ from src.data.schema import (
 from src.logic.summaries import top_city_summary, bottom_city_summary, scenario_summary
 
 
+def _plain_text(md_text: str) -> str:
+    """Remove lightweight markdown markers for HTML-rendered strings."""
+    return (
+        md_text.replace("**", "")
+        .replace("__", "")
+        .replace("`", "")
+    )
+
+
 def render_summary_panel(
     results: List[ScoringResult],
     scenario_name: str,
@@ -28,17 +37,41 @@ def render_summary_panel(
 
     top = results[0]
     bottom = results[-1]
+    spread = top.total_score - bottom.total_score if len(results) > 1 else 0.0
 
     with st.container(border=True):
-        st.markdown("##### Interpretation")
+        st.markdown("##### Interpretation & Insights")
+        st.caption("Read this section as an executive summary of the current weighting scenario.")
+        key_takeaway = (
+            f"{top.city} currently leads with a total score of {top.total_score:.2f}, "
+            f"outperforming {bottom.city} by {spread:.2f} points under this weighting profile."
+        )
+        st.markdown(f'<p class="sw-insight-key">{key_takeaway}</p>', unsafe_allow_html=True)
         a, b = st.columns(2, gap="medium")
         with a:
-            st.markdown("**Leading candidate**")
-            st.caption(top_city_summary(top))
+            st.markdown(
+                (
+                    '<div class="sw-insight-card">'
+                    '<p class="sw-insight-title">Leading Candidate</p>'
+                    f'<p class="sw-insight-body">{_plain_text(top_city_summary(top))}</p>'
+                    "</div>"
+                ),
+                unsafe_allow_html=True,
+            )
         with b:
-            st.markdown("**Trailing candidate**")
-            st.caption(bottom_city_summary(bottom))
-        st.markdown("")
+            st.markdown(
+                (
+                    '<div class="sw-insight-card">'
+                    '<p class="sw-insight-title">Trailing Candidate</p>'
+                    f'<p class="sw-insight-body">{_plain_text(bottom_city_summary(bottom))}</p>'
+                    "</div>"
+                ),
+                unsafe_allow_html=True,
+            )
+        c1, c2, c3 = st.columns(3, gap="small")
+        c1.metric("Leader", top.city, f"{top.total_score:.2f}")
+        c2.metric("Trailer", bottom.city, f"{bottom.total_score:.2f}")
+        c3.metric("Spread", f"{spread:.2f}", "best vs worst")
         st.info(scenario_summary(scenario_name, results))
 
 
