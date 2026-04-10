@@ -42,6 +42,27 @@ def render_summary_panel(
     with st.container(border=True):
         st.markdown("##### Interpretation & Insights")
         st.caption("Read this section as an executive summary of the current weighting scenario.")
+        if len(results) == 1:
+            key_takeaway = (
+                f"Only one city is available: {top.city} with a total score of "
+                f"{top.total_score:.2f}. Add more cities to enable leader vs trailer comparisons."
+            )
+            st.markdown(f'<p class="sw-insight-key">{key_takeaway}</p>', unsafe_allow_html=True)
+            st.markdown(
+                (
+                    '<div class="sw-insight-card">'
+                    '<p class="sw-insight-title">Current Candidate</p>'
+                    f'<p class="sw-insight-body">{_plain_text(top_city_summary(top))}</p>'
+                    "</div>"
+                ),
+                unsafe_allow_html=True,
+            )
+            c1, c2 = st.columns(2, gap="small")
+            c1.metric("City", top.city, f"{top.total_score:.2f}")
+            c2.metric("Comparison status", "Insufficient data", "need at least 2 cities")
+            st.info("Comparative scenario interpretation is available when at least two cities are ranked.")
+            return
+
         key_takeaway = (
             f"{top.city} currently leads with a total score of {top.total_score:.2f}, "
             f"outperforming {bottom.city} by {spread:.2f} points under this weighting profile."

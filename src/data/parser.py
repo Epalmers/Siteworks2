@@ -73,6 +73,11 @@ def parse_rh_workbook(path: Path) -> Optional[Dict[str, CityData]]:
         parsed = _extract_scores_long(sheet)
         if parsed:
             return parsed
+        logger.error(
+            "Sheet appears to be long format, but long-format parsing returned no data. "
+            "Refusing fallback to wide parser to avoid misinterpreting workbook."
+        )
+        return {}
 
     return _extract_scores(sheet)
 
