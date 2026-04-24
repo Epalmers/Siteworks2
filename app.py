@@ -69,6 +69,7 @@ from src.ui.explainers import (
     render_data_quality_panel,
     render_future_features,
 )
+from src.ui.zoning_map import render_industrial_zoning_map
 from src.ui.styles import (
     apply_global_styles,
     render_hero,
@@ -232,6 +233,23 @@ def _render_overview_tab(results, scenario_name):
             ),
             width="stretch",
         )
+
+    st.markdown("<div class='sw-spacer'></div>", unsafe_allow_html=True)
+    with st.container(border=True):
+        st.markdown("##### Industrial Zoning (map)")
+        st.caption(
+            "Municipal **industrial** (or land-use) parcels from the pilot shapefiles in "
+            "`data/Zoning_Spatial_Data/`. Toggle cities in the layer control; colours match "
+            "the dashboard city palette. Large metros may show a **sample** of parcels for performance."
+        )
+        map_cities = st.multiselect(
+            "Cities to show on map",
+            options=city_options,
+            default=city_options,
+            key="zoning_map_city_pick",
+            help="Industrial / industrial-use polygons from the packaged .zip shapefiles by city.",
+        )
+        render_industrial_zoning_map(map_cities)
 
     st.markdown("<div class='sw-spacer'></div>", unsafe_allow_html=True)
     render_summary_panel(results, scenario_name)
