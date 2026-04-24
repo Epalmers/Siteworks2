@@ -239,17 +239,18 @@ def _render_overview_tab(results, scenario_name):
         st.markdown("##### Industrial Zoning (map)")
         st.caption(
             "Municipal **industrial** (or land-use) parcels from the pilot shapefiles in "
-            "`data/Zoning_Spatial_Data/`. Toggle cities in the layer control; colours match "
-            "the dashboard city palette. Large metros may show a **sample** of parcels for performance."
+            "`data/Zoning_Spatial_Data/`. Choose a city to focus the map; the view "
+            "fits the industrial areas for that city. Colours match the dashboard city palette. "
+            "Large metros may show a **sample** of parcels for performance."
         )
-        map_cities = st.multiselect(
-            "Cities to show on map",
+        map_city = st.selectbox(
+            "City to show on map",
             options=city_options,
-            default=city_options,
-            key="zoning_map_city_pick",
-            help="Industrial / industrial-use polygons from the packaged .zip shapefiles by city.",
+            index=0,
+            key="zoning_map_city_select",
+            help="Industrial / industrial-use polygons from the packaged .zip shapefile for this city.",
         )
-        render_industrial_zoning_map(map_cities)
+        render_industrial_zoning_map(map_city)
 
     st.markdown("<div class='sw-spacer'></div>", unsafe_allow_html=True)
     render_summary_panel(results, scenario_name)

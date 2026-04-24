@@ -155,17 +155,18 @@ def build_industrial_zoning_map(
         return None, meta
 
     _fit_map_bounds(m, gdfs)
-    folium.LayerControl(collapsed=False).add_to(m)
+    if len(gdfs) > 1:
+        folium.LayerControl(collapsed=False).add_to(m)
     return m, meta
 
 
-def render_industrial_zoning_map(selected_cities: List[str]) -> None:
-    """Streamlit: render the industrial-zoning map for selected cities."""
-    if not selected_cities:
-        st.info("Select at least one city to show on the map.")
+def render_industrial_zoning_map(selected_city: str) -> None:
+    """Streamlit: render the industrial-zoning map for a single city (map zooms to that extent)."""
+    if not (selected_city or "").strip():
+        st.info("Select a city to show on the map.")
         return
 
-    m, meta = build_industrial_zoning_map(selected_cities)
+    m, meta = build_industrial_zoning_map([selected_city])
     if m is None:
         parts: List[str] = []
         for row in meta:
