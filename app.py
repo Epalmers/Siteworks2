@@ -238,10 +238,10 @@ def _render_overview_tab(results, scenario_name):
     with st.container(border=True):
         st.markdown("##### Industrial Zoning (map)")
         st.caption(
-            "Municipal **industrial** (or land-use) parcels from the pilot shapefiles in "
-            "`data/Zoning_Spatial_Data/`. Choose a city to focus the map; the view "
-            "fits the industrial areas for that city. Colours match the dashboard city palette. "
-            "Large metros may show a **sample** of parcels for performance."
+            "Municipal **industrial** (or land-use) areas from the pilot shapefiles in "
+            "`data/Zoning_Spatial_Data/`. The map **merges** all source parcels for the city into "
+            "a single **full-coverage** extent (boundaries are simplified for display). "
+            "Choose a city to focus the view. Colours match the dashboard city palette."
         )
         map_city = st.selectbox(
             "City to show on map",

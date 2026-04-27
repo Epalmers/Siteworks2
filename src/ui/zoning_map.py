@@ -27,20 +27,21 @@ ZONING_ZIP_STEM: Dict[str, str] = {
 
 _ZONING_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "Zoning_Spatial_Data"
 
-# Simplification in Web Mercator metres before mapping.
+# Per-parcel simplification in Web Mercator metres (before merge).
 _SIMPLIFY_M = 45.0
-# If a city has more than this many polygon rows, we random-sample for the web map
-# (keeps the browser responsive; full metro parcel counts can be 10^4+).
-_MAX_FEATURES = 3000
-_SAMPLE_SIZE = 500
-_RNG_SEED = 7
+# After dissolving all parcels into one industrial extent, simplify again (metres) so
+# the merged outline is lighter in the browser (huge MSAs can still be multi-MB).
+_SIMPLIFY_MERGED_M = 100.0
 
 
 @st.cache_data(show_spinner="Loading industrial zoning layers …", ttl=None)
 def _load_industrial_gdf(
     city: str,
 ) -> Tuple[Optional[gpd.GeoDataFrame], Dict[str, Any]]:
-    """Load and prepare industrial zoning for one city. Cached per city name."""
+    """
+    Load all industrial parcels, merge to one dissolved extent, and return GeoDataFrame
+    with a single feature (geometry only) for Folium.
+    """
     stem = ZONING_ZIP_STEM.get(city)
     if not stem:
         return None, {"missing_city": city}
@@ -52,28 +53,27 @@ def _load_industrial_gdf(
     path = f"zip://{zip_path.resolve().as_posix()}!{stem}.shp"
     gdf = gpd.read_file(path, on_invalid="ignore")
     gdf = gdf[gdf.geometry.notna()].copy()
-    n_total = len(gdf)
-    if n_total == 0:
+    n_parcels = len(gdf)
+    if n_parcels == 0:
         return None, {"empty": city}
 
-    sampled = False
     gdf = gdf.reset_index(drop=True)
-    if n_total > _MAX_FEATURES:
-        gdf = gdf.sample(n=_SAMPLE_SIZE, random_state=_RNG_SEED)
-        sampled = True
-
     gdf = gdf.to_crs(3857)
     gdf["geometry"] = gdf.geometry.simplify(_SIMPLIFY_M, preserve_topology=True)
+    gdf = gdf[(~gdf.geometry.is_empty) & gdf.geometry.notna()]
+    gdf = gdf[["geometry"]].copy()
+    gdf = gdf.assign(_sw_dissolve=1)
+    gdf = gdf.dissolve(by="_sw_dissolve", as_index=False)
+    gdf = gdf.drop(columns=["_sw_dissolve"], errors="ignore")
+    gdf["geometry"] = gdf.geometry.simplify(
+        _SIMPLIFY_MERGED_M, preserve_topology=True
+    )
     gdf = gdf.to_crs(4326)
     gdf = gdf[(~gdf.geometry.is_empty) & gdf.geometry.notna()]
-    # Folium serialises the GeoDataFrame; drop attribute columns (some DBF types
-    # e.g. dates are not JSON-friendly).
-    gdf = gdf[["geometry"]].copy()
 
     info: Dict[str, Any] = {
-        "n_total": n_total,
-        "n_shown": int(len(gdf)),
-        "sampled": sampled,
+        "n_parcels": n_parcels,
+        "n_map_features": int(len(gdf)),
     }
     return gdf, info
 
@@ -137,7 +137,9 @@ def build_industrial_zoning_map(
             name=city,
             style_function=style,
             highlight_function=hstyle,
-            tooltip=folium.Tooltip(f"{city} — industrial / industrial-use zoning"),
+            tooltip=folium.Tooltip(
+                f"{city} — industrial extent (all parcels merged; boundaries simplified)"
+            ),
         )
         layer.add_to(fg)
         fg.add_to(m)
@@ -145,9 +147,7 @@ def build_industrial_zoning_map(
             {
                 "city": city,
                 "ok": True,
-                "n_total": info.get("n_total"),
-                "n_shown": info.get("n_shown"),
-                "sampled": info.get("sampled", False),
+                "n_parcels": info.get("n_parcels"),
             }
         )
 
@@ -184,10 +184,11 @@ def render_industrial_zoning_map(selected_city: str) -> None:
 
     ok_rows = [row for row in meta if row.get("ok")]
     for row in ok_rows:
-        if row.get("sampled"):
+        n_p = row.get("n_parcels")
+        if n_p is not None:
             st.caption(
-                f"**{row['city']}**: showing **{row['n_shown']:,}** of **{row['n_total']:,}** "
-                f"industrial parcel polygons (random sample for map performance)."
+                f"**{row['city']}**: map shows the **full industrial extent** from **{n_p:,}** "
+                f"source parcels, merged into one area (boundaries simplified for display)."
             )
 
     err_rows = [row for row in meta if not row.get("ok")]
