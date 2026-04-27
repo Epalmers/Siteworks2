@@ -16,7 +16,6 @@ env/
 .streamlit/secrets.toml
 
 # Data files (large binaries – add manually if needed)
-data/*.xlsx
 data/*.docx
 data/*.pptx
 
