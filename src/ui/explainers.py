@@ -100,7 +100,7 @@ def render_scoring_explainer_body() -> None:
     """Scoring methodology (no expander wrapper)."""
     st.markdown(
         """
-**Weighted multi-criteria decision analysis (MCDA)** — each city is scored on **15**
+**Weighted multi-criteria decision analysis (MCDA)** — each city is scored on **16**
 subcategories in **5** themes. All scores use a **1–5** scale (**5** = best for
 data-center siting).
 
@@ -160,7 +160,8 @@ def render_data_quality_panel(
             st.success("Loaded from **Data_Center_Site_Selector_RH.xlsx**.")
         else:
             st.warning(
-                "Workbook not found in `data/`. Using the **built-in pilot** dataset."
+                "The app requires **Data_Center_Site_Selector_RH.xlsx** in `data/`. "
+                "Place the file and use **Refresh data** in the sidebar."
             )
 
         st.markdown("**Notes & caveats**")
@@ -168,8 +169,8 @@ def render_data_quality_panel(
             st.markdown(f"- {note}")
 
         st.caption(
-            "To use your file: place **Data_Center_Site_Selector_RH.xlsx** in the "
-            "`data/` folder and restart the app (or clear cache)."
+            "Data loads only from **Data_Center_Site_Selector_RH.xlsx** in `data/`. "
+            "Use **Refresh data** in the sidebar after changing the file."
         )
 
 

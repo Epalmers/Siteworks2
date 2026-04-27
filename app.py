@@ -84,7 +84,11 @@ import src.logic.scoring as _scoring_module
 # ---------------------------------------------------------------------------
 
 @st.cache_data(show_spinner="Loading city data …")
-def _load():
+def _load(_loader_version: int = 4):
+    """
+    Loader cache entry. Bump _loader_version default when load_city_data()
+    return tuple shape changes (invalidates stale Streamlit cache hits).
+    """
     return load_city_data()
 
 
@@ -265,8 +269,10 @@ def _render_overview_tab(results, scenario_name):
 def main():
     apply_global_styles()
 
-    city_data_base, quality_notes, from_workbook = _load()
-    weights, scenario_name, drought_mode, future_climate_mode = render_sidebar()
+    city_data_base, quality_notes, from_workbook, workbook_weights = _load()
+    weights, scenario_name, drought_mode, future_climate_mode = render_sidebar(
+        workbook_default_weights=workbook_weights,
+    )
 
     city_data = city_data_base
     if drought_mode:
@@ -276,7 +282,10 @@ def main():
 
     results = rank_cities(city_data, weights)
     if not results:
-        st.error("No ranking results available. Check input data and refresh.")
+        st.error("No ranking results — the workbook did not load or has no cities.")
+        for note in quality_notes[:6]:
+            st.caption(note)
+        st.info("Add **Data_Center_Site_Selector_RH.xlsx** to `data/` and click **Refresh data** in the sidebar.")
         return
 
     _render_top_summary(results, from_workbook, drought_mode, future_climate_mode)
@@ -339,7 +348,7 @@ Oklahoma City · Boston · Denver · Houston · Gainesville
 | Hydrological & Regulatory Risk | 25% | Water scarcity, precipitation, reuse |
 | Climate & Operational Physics | 30% | Cooling load, humidity, grid carbon |
 | Economic & Social Impact | 15% | Power rates, water cost, equity |
-| Natural Hazards | 20% | Flood, tornado, wildlife, winter |
+| Natural Hazards | 20% | Seismic, flood, tornado, wildlife, winter |
 | Biodiversity | 10% | Protected-area constraints |
 
 **Scale**  

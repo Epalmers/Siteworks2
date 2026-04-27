@@ -5,7 +5,7 @@ Renders weight sliders, scenario presets, and supplementary controls.
 Returns the current normalised weights to the caller.
 """
 
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 import streamlit as st
 
@@ -24,10 +24,15 @@ _SHORT_LABELS: Dict[str, str] = {
 }
 
 
-def render_sidebar() -> Tuple[Dict[str, float], str, bool, bool]:
+def render_sidebar(
+    workbook_default_weights: Optional[Dict[str, float]] = None,
+) -> Tuple[Dict[str, float], str, bool, bool]:
     """
     Render the sidebar and return:
         (normalised_weights, scenario_name, drought_mode, future_climate_mode)
+
+    If **workbook_default_weights** is provided (from the **Account Weights** sheet),
+    the **Default** scenario uses those values instead of app defaults.
     """
     st.sidebar.markdown("## Controls")
     st.sidebar.caption("Weights & scenarios drive all rankings and charts.")
@@ -46,7 +51,14 @@ def render_sidebar() -> Tuple[Dict[str, float], str, bool, bool]:
         st.sidebar.caption(SCENARIO_DESCRIPTIONS[scenario_name])
 
     # Determine starting weights from scenario
-    preset_weights = SCENARIO_WEIGHTS[scenario_name]
+    if (
+        scenario_name == "Default"
+        and workbook_default_weights
+        and all(c in workbook_default_weights for c in CATEGORIES)
+    ):
+        preset_weights = workbook_default_weights
+    else:
+        preset_weights = SCENARIO_WEIGHTS[scenario_name]
 
     # Keep slider state in sync when preset changes.
     if "_last_scenario_preset" not in st.session_state:

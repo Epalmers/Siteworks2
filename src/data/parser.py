@@ -3,21 +3,16 @@ parser.py – Excel workbook ingestion for Siteworks.
 
 PARSING ASSUMPTIONS (documented here per project spec):
 ========================================================
-1. The primary data source is `Data_Center_Site_Selector_RH.xlsx`,
-   specifically the sheet named "Site Selector Data - edited".
-2. Two layouts are supported:
-   a) Wide matrix: row 1 = city names from column B; column A = subcategory;
-      scores in the grid (legacy).
-   b) Long / tidy (distributed workbook): row 5 = headers including
-      Sub-Account, City, Score; rows 2–3 map city index numbers to names.
-3. In the wide layout, subcategory names appear in column A.
-4. Score cells contain numeric values in the 1–5 range.
-5. If a score cell is blank or non-numeric it is treated as missing (None).
-6. The workbook may contain extra sheets; the first matching sheet name wins.
-7. Raw measurement values (e.g., "47 inches/year") may appear in adjacent
-   cells; if present they are stored in SubcategoryScore.raw_value.
-8. The file `CIVE 580 Project MAA.xlsx` is treated as a future-expansion
-   template and is NOT parsed in this release.
+1. Preferred: multi-sheet workbook layout:
+     • **Scores** — wide table (row 1 = headers; City, Name; then sub-account scores).
+     • **City Assignments** — optional City ↔ numeric code (optional if Names are in Scores).
+     • **Values** — optional same layout as Scores with raw measurements → raw_value.
+     • **Account Weights** — optional Account | Weight for category defaults (must match CATEGORIES).
+2. Legacy single-sheet layouts if multi-sheet parse does not yield ≥3 cities:
+   a) Sheet "Site Selector Data - edited" (or candidates in _find_sheet):
+      Wide matrix OR long / tidy (row 5 headers; rows 2–3 city codes).
+3. Score cells contain numeric values in the 1–5 range (see _parse_score).
+4. Columns that do not map to schema subcategories (e.g. Seismic) are skipped.
 
 If the workbook is absent or unreadable the loader falls back to the
 built-in pilot dataset defined in loader.py.
@@ -25,65 +20,282 @@ built-in pilot dataset defined in loader.py.
 
 import logging
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from src.data.schema import (
+    CATEGORIES,
     SUBCATEGORIES,
     PILOT_CITIES,
     SubcategoryScore,
     CityData,
 )
+from src.logic.scoring import normalize_weights
 
 logger = logging.getLogger(__name__)
+
+# Workbook column titles (Scores / Values) → canonical SUBCATEGORIES keys.
+# Columns with no mapping (e.g. Seismic) are skipped for scoring.
+_HEADER_ALIASES: Dict[str, str] = {
+    "baseline water stress (regional)": "Baseline Water Stress",
+    "annual precipitation (1991-2020)": "Annual Precipitation",
+    "recycled water infrastructure": "Recycled Water Infrastructure",
+    "cooling degree days (1991-2020)": "Cooling Degree Days",
+    "annual mean relative humidity": "Annual Mean Humidity",
+    "carbon regulations": "Grid Carbon Intensity",
+    "renewable energy mix": "Renewable Energy Mix",
+    "industrial electricity rate (2024)": "Industrial Electricity Rate",
+    "water & sewer cost (industrial)": "Water & Sewer Cost",
+    "environmental justice index": "Environmental Justice Index",
+    "seismic hazard (usgs 2023)": "Seismic Hazard",
+    "flood risk zone": "Flood Risk",
+    "tornado frequency (annual avg)": "Tornado Frequency",
+    "wildfire hazard": "Wildlife Hazard",
+    "winter weather disruption": "Winter Weather Disruption",
+    "protected area proximity": "Protected Area Proximity",
+}
 
 # ---------------------------------------------------------------------------
 # Public parse entry point
 # ---------------------------------------------------------------------------
 
-def parse_rh_workbook(path: Path) -> Optional[Dict[str, CityData]]:
+def parse_rh_workbook(path: Path) -> Tuple[Optional[Dict[str, CityData]], Optional[Dict[str, float]]]:
     """
-    Parse `Data_Center_Site_Selector_RH.xlsx` and return a city → CityData map.
+    Parse `Data_Center_Site_Selector_RH.xlsx`.
 
-    Returns None if openpyxl is unavailable or the file cannot be read.
-    Partial data (some scores missing) is returned with quality notes rather
-    than raising an exception.
+    Returns:
+        (city_data_map or None, category_weights or None)
+        Category weights are present when the **Account Weights** sheet was read successfully.
+
+    Returns (None, None) if openpyxl is unavailable or the file cannot be read.
     """
     try:
         import openpyxl  # noqa: PLC0415  (optional dependency)
     except ImportError:
-        logger.warning("openpyxl not installed – falling back to built-in data.")
-        return None
+        logger.warning("openpyxl not installed – cannot read workbook.")
+        return None, None
 
     if not path.is_file():
-        logger.info("Workbook not found at %s – using built-in data.", path)
-        return None
+        logger.info("Workbook not found at %s.", path)
+        return None, None
 
     try:
         wb = openpyxl.load_workbook(path, data_only=True)
     except Exception as exc:  # noqa: BLE001
         logger.error("Failed to open workbook %s: %s", path, exc)
-        return None
+        return None, None
 
-    sheet = _find_sheet(wb)
-    if sheet is None:
-        logger.warning("Could not locate 'Site Selector Data - edited' sheet.")
-        return None
+    try:
+        parsed_ms, weights_ms = _try_parse_multisheet_workbook(wb)
+        if parsed_ms and len(parsed_ms) >= 1:
+            return parsed_ms, weights_ms
 
-    if _sheet_looks_long_format(sheet):
-        parsed = _extract_scores_long(sheet)
-        if parsed:
-            return parsed
-        logger.error(
-            "Sheet appears to be long format, but long-format parsing returned no data. "
-            "Refusing fallback to wide parser to avoid misinterpreting workbook."
+        sheet = _find_sheet(wb)
+        if sheet is None:
+            logger.warning("Could not locate a data sheet for legacy parsing.")
+            return None, None
+
+        if _sheet_looks_long_format(sheet):
+            parsed = _extract_scores_long(sheet)
+            if parsed:
+                return parsed, None
+            logger.error(
+                "Sheet appears to be long format, but long-format parsing returned no data. "
+                "Refusing fallback to wide parser to avoid misinterpreting workbook."
+            )
+            return {}, None
+
+        legacy = _extract_scores(sheet)
+        return legacy if legacy else None, None
+    finally:
+        wb.close()
+
+
+def _try_parse_multisheet_workbook(wb) -> Tuple[Optional[Dict[str, CityData]], Optional[Dict[str, float]]]:
+    """Parse **Scores** (+ optional **Values**, **Account Weights**, **City Assignments**)."""
+    if "Scores" not in wb.sheetnames:
+        return None, None
+
+    city_by_code = {}
+    if "City Assignments" in wb.sheetnames:
+        city_by_code = _parse_city_assignments_sheet(wb["City Assignments"])
+
+    parsed = _parse_scores_wide_sheet(wb["Scores"], city_by_code)
+    if not parsed:
+        return None, None
+
+    if "Values" in wb.sheetnames:
+        _merge_values_wide_sheet(wb["Values"], parsed)
+
+    weights: Optional[Dict[str, float]] = None
+    if "Account Weights" in wb.sheetnames:
+        weights = _parse_account_weights_sheet(wb["Account Weights"])
+
+    return parsed, weights
+
+
+def _header_to_canonical(header: str, all_subs: Dict[str, str]) -> Optional[str]:
+    low = header.lower().strip()
+    if low in _HEADER_ALIASES:
+        return _HEADER_ALIASES[low]
+    if "seismic" in low and "hazard" in low:
+        return "Seismic Hazard"
+    if "wildfire" in low:
+        return "Wildlife Hazard"
+    norm = _normalize_workbook_sub_label(header)
+    found = _match_subcategory(norm, all_subs)
+    if found:
+        return found
+    return _match_subcategory(header, all_subs)
+
+
+def _parse_city_assignments_sheet(sheet) -> Dict[int, str]:
+    """**City Assignments** sheet: City (col A), Code (col B)."""
+    out: Dict[int, str] = {}
+    for row in sheet.iter_rows(min_row=2, values_only=True):
+        if not row or row[0] is None:
+            continue
+        name = str(row[0]).strip()
+        code_raw = row[1] if len(row) > 1 else None
+        try:
+            code = int(float(str(code_raw).strip()))
+        except (TypeError, ValueError):
+            continue
+        if name:
+            out[code] = name
+    return out
+
+
+def _parse_scores_wide_sheet(
+    sheet,
+    city_by_code: Dict[int, str],
+) -> Optional[Dict[str, CityData]]:
+    """**Scores** sheet: row 1 headers; col A = city code; col B = city name; scores from col C."""
+    row1 = list(sheet.iter_rows(min_row=1, max_row=1, values_only=True))
+    if not row1:
+        return None
+    headers = row1[0]
+    all_subs = {
+        sub: sub for subs in SUBCATEGORIES.values() for sub in subs
+    }
+    col_canon: List[Tuple[int, str]] = []
+    for i in range(2, len(headers)):
+        h = headers[i]
+        if h is None or not str(h).strip():
+            continue
+        canon = _header_to_canonical(str(h).strip(), all_subs)
+        if canon:
+            col_canon.append((i, canon))
+        else:
+            logger.info("Scores sheet: skipping unmapped column %r", h)
+
+    city_data: Dict[str, CityData] = {}
+    for row in sheet.iter_rows(min_row=2, values_only=True):
+        if not row or len(row) < 2 or row[1] is None:
+            continue
+        city_name = str(row[1]).strip()
+        if not city_name:
+            continue
+
+        if city_by_code and row[0] is not None:
+            try:
+                code = int(float(str(row[0]).strip()))
+                mapped = city_by_code.get(code)
+                if mapped and mapped.lower() != city_name.lower():
+                    logger.warning(
+                        "City code %s maps to %r but row Name=%r — using Name column.",
+                        code,
+                        mapped,
+                        city_name,
+                    )
+            except (TypeError, ValueError):
+                pass
+
+        if city_name not in city_data:
+            city_data[city_name] = CityData(name=city_name)
+
+        for idx, canon in col_canon:
+            raw_score = row[idx] if len(row) > idx else None
+            score = _parse_score(raw_score)
+            city_data[city_name].subcategory_scores[canon] = SubcategoryScore(
+                name=canon,
+                score=score if score is not None else float("nan"),
+                raw_value=None,
+                note=(
+                    "Parsed from workbook (Scores)"
+                    if score is not None
+                    else "Missing/blank"
+                ),
+            )
+            if score is None:
+                city_data[city_name].data_quality_notes.append(
+                    f"Missing score for '{canon}'"
+                )
+
+    return city_data if city_data else None
+
+
+def _merge_values_wide_sheet(values_sheet, city_data: Dict[str, CityData]) -> None:
+    """Merge **Values** sheet raw measurements into existing SubcategoryScore.raw_value."""
+    row1 = next(values_sheet.iter_rows(min_row=1, max_row=1, values_only=True))
+    all_subs = {
+        sub: sub for subs in SUBCATEGORIES.values() for sub in subs
+    }
+    col_canon: List[Tuple[int, str]] = []
+    for i in range(2, len(row1)):
+        h = row1[i]
+        if h is None or not str(h).strip():
+            continue
+        canon = _header_to_canonical(str(h).strip(), all_subs)
+        if canon:
+            col_canon.append((i, canon))
+
+    for row in values_sheet.iter_rows(min_row=2, values_only=True):
+        if not row or len(row) < 2 or row[1] is None:
+            continue
+        city_name = str(row[1]).strip()
+        if city_name not in city_data:
+            continue
+        cd = city_data[city_name]
+        for idx, canon in col_canon:
+            raw = row[idx] if len(row) > idx else None
+            if canon not in cd.subcategory_scores:
+                continue
+            entry = cd.subcategory_scores[canon]
+            if raw is not None:
+                entry.raw_value = str(raw).strip()
+
+
+def _parse_account_weights_sheet(sheet) -> Optional[Dict[str, float]]:
+    """**Account Weights**: Account | Weight for each entry in CATEGORIES."""
+    raw: Dict[str, float] = {}
+    for row in sheet.iter_rows(min_row=2, values_only=True):
+        if not row or row[0] is None:
+            continue
+        label = str(row[0]).strip()
+        try:
+            f = float(row[1])
+        except (TypeError, ValueError, IndexError):
+            continue
+        for cat in CATEGORIES:
+            if cat.lower() == label.lower():
+                raw[cat] = f
+                break
+
+    if len(raw) != len(CATEGORIES):
+        logger.warning(
+            "Account Weights sheet: need %s categories, found %s keys.",
+            len(CATEGORIES),
+            len(raw),
         )
-        return {}
-
-    return _extract_scores(sheet)
+        return None
+    try:
+        return normalize_weights(raw)
+    except ValueError:
+        return None
 
 
 # ---------------------------------------------------------------------------
-# Internal helpers
+# Internal helpers (legacy single-sheet layouts)
 # ---------------------------------------------------------------------------
 
 def _find_sheet(wb):
@@ -156,6 +368,8 @@ def _normalize_workbook_sub_label(label: str) -> str:
     low = label.lower()
     if "wildfire hazard" in low:
         return "Wildlife Hazard"
+    if "seismic" in low and "hazard" in low:
+        return "Seismic Hazard"
     return label
 
 

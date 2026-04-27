@@ -52,6 +52,7 @@ SUBCATEGORIES: Dict[str, List[str]] = {
         "Environmental Justice Index",
     ],
     "Natural Hazards": [
+        "Seismic Hazard",
         "Flood Risk",
         "Tornado Frequency",
         "Wildlife Hazard",
@@ -74,6 +75,7 @@ SUBCATEGORY_TOOLTIPS: Dict[str, str] = {
     "Industrial Electricity Rate":    "Cost of electricity for large industrial consumers.",
     "Water & Sewer Cost":             "Cost of water procurement and wastewater disposal.",
     "Environmental Justice Index":    "Community equity and regulatory / reputational risk.",
+    "Seismic Hazard":                 "Ground-shaking risk (e.g. USGS / design category); lower risk = better score.",
     "Flood Risk":                     "Probability and severity of flooding events.",
     "Tornado Frequency":              "Historical tornado activity in the region.",
     "Wildlife Hazard":                "Risk of wildlife-related disruptions (e.g., bird strikes, pests).",
@@ -93,6 +95,7 @@ SUBCATEGORY_SOURCES: Dict[str, str] = {
     "Industrial Electricity Rate":    "https://www.eia.gov/electricity/",
     "Water & Sewer Cost":             "https://www.awwa.org/",
     "Environmental Justice Index":    "https://ejscreen.epa.gov/",
+    "Seismic Hazard":                 "https://earthquake.usgs.gov/hazards/",
     "Flood Risk":                     "https://msc.fema.gov/portal/home",
     "Tornado Frequency":              "https://www.spc.noaa.gov/",
     "Wildlife Hazard":                "https://www.fws.gov/",

@@ -41,8 +41,7 @@ streamlit run app.py
 A browser window will open automatically at **http://localhost:8501** showing the dashboard.  
 If it doesn't open automatically, copy that address into your browser.
 
-> **Tip:** The app works out of the box with its built-in pilot data — no Excel file required.  
-> To use your own workbook, place `Data_Center_Site_Selector_RH.xlsx` in the `data/` folder and restart.
+> **Tip:** Place **`Data_Center_Site_Selector_RH.xlsx`** in the `data/` folder before running — the app loads scores **only** from that workbook (multisheet layout; see `parser.py`).
 
 ---
 
@@ -86,14 +85,14 @@ Siteworks puts these factors side by side so decision-makers can explore trade-o
 Siteworks implements a **Weighted MCDA** model as specified in the `CIVE580 Algorithms for AI.docx` document.
 
 ### Step 1 – Subcategory scores
-Each city receives a score of **1–5** (5 = best) on 15 subcategory metrics:
+Each city receives a score of **1–5** (5 = best) on 16 subcategory metrics:
 
 | Category (default weight) | Subcategories |
 |---|---|
 | Hydrological & Regulatory Risk (25%) | Baseline Water Stress, Annual Precipitation, Recycled Water Infrastructure |
 | Climate & Operational Physics (30%) | Cooling Degree Days, Annual Mean Humidity, Grid Carbon Intensity, Renewable Energy Mix |
 | Economic & Social Impact (15%) | Industrial Electricity Rate, Water & Sewer Cost, Environmental Justice Index |
-| Natural Hazards (20%) | Flood Risk, Tornado Frequency, Wildlife Hazard, Winter Weather Disruption |
+| Natural Hazards (20%) | Seismic Hazard, Flood Risk, Tornado Frequency, Wildlife Hazard, Winter Weather Disruption |
 | Biodiversity (10%) | Protected Area Proximity |
 
 Note: some metrics are **scored inversely** — for example, high tornado frequency gives a low score.
@@ -121,7 +120,7 @@ Cities are sorted from highest total score (most suitable) to lowest.
 | `Project_Roadmap.docx` | Feature roadmap and product requirements |
 | `CIVE 580 Project MAA.xlsx` | Future-expansion template; **not parsed** in this release |
 | `Data-Center-Site-Selector-A-Vibe-Coding-Approach.pptx` | UX and product direction |
-| `src/data/loader.py` | Built-in pilot dataset + Excel loader |
+| `src/data/loader.py` | Excel workbook loader (required file in `data/`) |
 | `src/data/parser.py` | Excel workbook parser (documented assumptions inside) |
 | `src/logic/scoring.py` | MCDA scoring engine |
 | `src/logic/scenarios.py` | Weight presets and scenario modifiers |
@@ -147,9 +146,8 @@ cd Siteworks2
 pip install -r requirements.txt
 ```
 
-### (Optional) Add the Excel workbook
-Place `Data_Center_Site_Selector_RH.xlsx` in the `/data/` folder.  
-If the file is absent, the app uses its built-in pilot dataset.
+### Add the Excel workbook (required)
+Place **`Data_Center_Site_Selector_RH.xlsx`** in the **`data/`** folder. The app does not run rankings without it.
 
 ### Run the app
 ```bash
@@ -189,7 +187,7 @@ src/
   data/
     schema.py           ← Normalized data model (dataclasses, constants)
     parser.py           ← Excel workbook parser (assumptions documented here)
-    loader.py           ← Data loader + built-in pilot dataset
+    loader.py           ← Excel workbook loader
   logic/
     scoring.py          ← MCDA scoring engine
     validation.py       ← Weight and score validation helpers

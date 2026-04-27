@@ -385,7 +385,7 @@ def render_hero(*, from_workbook: bool) -> None:
     badge_live = (
         '<span class="sw-badge sw-badge-live">Excel workbook</span>'
         if from_workbook
-        else '<span class="sw-badge sw-badge-pilot">Built-in pilot data</span>'
+        else '<span class="sw-badge sw-badge-pilot">Workbook not loaded</span>'
     )
     badge_course = '<span class="sw-badge sw-badge-course">CIVE-580</span>'
 
