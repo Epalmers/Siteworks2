@@ -44,7 +44,7 @@ import streamlit as st
 
 # --- Page config (must be first Streamlit call) ---
 st.set_page_config(
-    page_title="Siteworks – Data Center Site Selector",
+    page_title="DCS Dashboard – Data Center Siting",
     page_icon="🏗️",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -67,7 +67,6 @@ from src.ui.explainers import (
     render_scoring_explainer_body,
     render_category_explainer_body,
     render_data_quality_panel,
-    render_future_features,
 )
 from src.ui.zoning_map import render_industrial_zoning_map
 from src.ui.styles import (
@@ -84,7 +83,7 @@ import src.logic.scoring as _scoring_module
 # ---------------------------------------------------------------------------
 
 @st.cache_data(show_spinner="Loading city data …")
-def _load(_loader_version: int = 4):
+def _load(_loader_version: int = 5):
     """
     Loader cache entry. Bump _loader_version default when load_city_data()
     return tuple shape changes (invalidates stale Streamlit cache hits).
@@ -129,9 +128,9 @@ def _render_leader_strip(results):
     )
 
 
-def _render_top_summary(results, from_workbook, drought_mode, future_climate_mode):
+def _render_top_summary(results, drought_mode, future_climate_mode):
     """Render hero, KPI strip, and snapshot row."""
-    render_hero(from_workbook=from_workbook)
+    render_hero()
     top = results[0]
     runner_up = results[1] if len(results) > 1 else None
     spread = top.total_score - results[-1].total_score if len(results) > 1 else 0.0
@@ -176,7 +175,7 @@ def _render_top_summary(results, from_workbook, drought_mode, future_climate_mod
     st.markdown("<div class='sw-spacer'></div>", unsafe_allow_html=True)
 
 
-def _render_overview_tab(results, scenario_name):
+def _render_overview_tab(results, scenario_name, workbook_sources=None):
     """Render summary -> comparison -> breakdown -> interpretation flow."""
     with st.container(border=True):
         st.markdown("##### Rankings")
@@ -247,10 +246,18 @@ def _render_overview_tab(results, scenario_name):
             "a single **full-coverage** extent (boundaries are simplified for display). "
             "Choose a city to focus the view. Colours match the dashboard city palette."
         )
+        _zm_rank_fp = tuple((r.city, r.rank) for r in results)
+        _zm_fp_key = "_zoning_map_ranking_fingerprint"
+        if (
+            _zm_fp_key not in st.session_state
+            or st.session_state[_zm_fp_key] != _zm_rank_fp
+        ):
+            st.session_state[_zm_fp_key] = _zm_rank_fp
+            st.session_state["zoning_map_city_select"] = results[0].city
+
         map_city = st.selectbox(
             "City to show on map",
             options=city_options,
-            index=0,
             key="zoning_map_city_select",
             help="Industrial / industrial-use polygons from the packaged .zip shapefile for this city.",
         )
@@ -263,13 +270,13 @@ def _render_overview_tab(results, scenario_name):
         render_scoring_explainer_body()
 
     with st.expander("Category definitions", expanded=False):
-        render_category_explainer_body()
+        render_category_explainer_body(workbook_sources)
 
 
 def main():
     apply_global_styles()
 
-    city_data_base, quality_notes, from_workbook, workbook_weights = _load()
+    city_data_base, quality_notes, from_workbook, workbook_weights, workbook_sources = _load()
     weights, scenario_name, drought_mode, future_climate_mode = render_sidebar(
         workbook_default_weights=workbook_weights,
     )
@@ -288,14 +295,14 @@ def main():
         st.info("Add **Data_Center_Site_Selector_RH.xlsx** to `data/` and click **Refresh data** in the sidebar.")
         return
 
-    _render_top_summary(results, from_workbook, drought_mode, future_climate_mode)
+    _render_top_summary(results, drought_mode, future_climate_mode)
 
     tab_overview, tab_compare, tab_data, tab_about = st.tabs(
         ["Overview", "Compare", "Data", "About"]
     )
 
     with tab_overview:
-        _render_overview_tab(results, scenario_name)
+        _render_overview_tab(results, scenario_name, workbook_sources)
 
     with tab_compare:
         with st.container(border=True):
@@ -313,9 +320,18 @@ def main():
                 "**5** always means better for data-center siting."
             )
 
+            _data_rank_fp = tuple((r.city, r.rank) for r in results)
+            _data_explorer_fp_key = "_data_explorer_ranking_fingerprint"
+            if (
+                _data_explorer_fp_key not in st.session_state
+                or st.session_state[_data_explorer_fp_key] != _data_rank_fp
+            ):
+                st.session_state[_data_explorer_fp_key] = _data_rank_fp
+                st.session_state["data_explorer_city"] = results[0].city
+
             selected_city = st.selectbox(
                 "City",
-                options=list(city_data.keys()),
+                options=[r.city for r in results],
                 key="data_explorer_city",
             )
 
@@ -325,7 +341,6 @@ def main():
                 render_subcategory_table(selected_city, cd, _scoring_module)
 
         render_data_quality_panel(quality_notes, from_workbook)
-        render_future_features()
 
     with tab_about:
         with st.container(border=True):

@@ -8,7 +8,7 @@ import streamlit as st
 
 from src.data.schema import CATEGORIES, SUBCATEGORIES, CityData, ScoringResult
 from src.logic.summaries import city_comparison_summary
-from src.ui.charts import comparison_bar, delta_bar
+from src.ui.charts import comparison_bar
 
 _CAT_SHORT: Dict[str, str] = {
     "Hydrological & Regulatory Risk": "💧 Hydro & Regulatory",
@@ -24,22 +24,39 @@ def render_comparison_view(
     all_results: List[ScoringResult],
 ) -> None:
     """Render the full two-city comparison view."""
-    city_names = list(city_data.keys())
+    if len(all_results) < 2:
+        st.warning("Add at least two cities in the workbook to compare.")
+        return
+
+    # Dropdowns use rank order; defaults are #1 vs #2 until rankings change (sidebar rerun).
+    city_names = [r.city for r in all_results]
+    rank_fp = tuple((r.city, r.rank) for r in all_results)
+    _fp_key = "_compare_ranking_fingerprint"
+    if (
+        _fp_key not in st.session_state
+        or st.session_state[_fp_key] != rank_fp
+    ):
+        st.session_state[_fp_key] = rank_fp
+        st.session_state["compare_a"] = all_results[0].city
+        st.session_state["compare_b"] = all_results[1].city
+
+    # Each list omits the other dropdown's pick so cities never duplicate as options.
+    other_b = st.session_state["compare_b"]
+    other_a = st.session_state["compare_a"]
+    options_first = [c for c in city_names if c != other_b]
+    options_second = [c for c in city_names if c != other_a]
 
     col1, col2 = st.columns(2)
     with col1:
         city_a = st.selectbox(
             "First city",
-            options=city_names,
-            index=0,
+            options=options_first,
             key="compare_a",
         )
     with col2:
-        default_b = city_names[1] if len(city_names) > 1 else city_names[0]
         city_b = st.selectbox(
             "Second city",
-            options=city_names,
-            index=city_names.index(default_b),
+            options=options_second,
             key="compare_b",
         )
 
@@ -70,7 +87,6 @@ def render_comparison_view(
         )
 
     st.plotly_chart(comparison_bar(ra, rb), width="stretch")
-    st.plotly_chart(delta_bar(ra, rb), width="stretch")
 
     st.markdown("##### Relative strengths")
     s1, s2 = st.columns(2)

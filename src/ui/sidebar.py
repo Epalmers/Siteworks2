@@ -143,6 +143,6 @@ def render_sidebar(
     )
 
     st.sidebar.markdown("---")
-    st.sidebar.caption("Siteworks · CIVE-580 · Scale 1–5 (5 = best for siting)")
+    st.sidebar.caption("DCS Dashboard · Scale 1–5 (5 = best for siting)")
 
     return norm_weights, scenario_name, drought_mode, future_climate

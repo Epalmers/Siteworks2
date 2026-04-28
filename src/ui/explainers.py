@@ -2,7 +2,8 @@
 explainers.py – Tooltips, plain-language panels, and data transparency views.
 """
 
-from typing import List
+from collections import defaultdict
+from typing import Dict, List, Optional, Tuple
 
 import streamlit as st
 
@@ -14,7 +15,52 @@ from src.data.schema import (
     DEFAULT_WEIGHTS,
     ScoringResult,
 )
-from src.logic.summaries import top_city_summary, bottom_city_summary, scenario_summary
+from src.logic.summaries import (
+    top_city_summary,
+    second_ranked_city_summary,
+    scenario_summary,
+)
+
+
+def _markdown_subcategory_sources(
+    sub: str,
+    workbook_sources: Optional[Dict[str, List[Tuple[str, str]]]],
+) -> str:
+    """Build source link markdown: one link if all cities agree; otherwise per-city lines."""
+    fallback = SUBCATEGORY_SOURCES.get(sub, "").strip()
+
+    def _link(url: str) -> str:
+        return f"[source]({url})"
+
+    if not workbook_sources:
+        return f" · {_link(fallback)}" if fallback else ""
+
+    pairs = workbook_sources.get(sub)
+    if not pairs:
+        return f" · {_link(fallback)}" if fallback else ""
+
+    url_to_cities: Dict[str, List[str]] = defaultdict(list)
+    for city, url in pairs:
+        if not url:
+            continue
+        u = str(url).strip()
+        if not u.startswith("http"):
+            continue
+        url_to_cities[u].append(city)
+
+    if not url_to_cities:
+        return f" · {_link(fallback)}" if fallback else ""
+
+    if len(url_to_cities) == 1:
+        only = next(iter(url_to_cities.keys()))
+        return f" · {_link(only)}"
+
+    parts = []
+    for url in sorted(url_to_cities.keys()):
+        cities = sorted(dict.fromkeys(url_to_cities[url]))
+        label = ", ".join(cities)
+        parts.append(f"{label}: {_link(url)}")
+    return " · " + " · ".join(parts)
 
 
 def _plain_text(md_text: str) -> str:
@@ -36,8 +82,6 @@ def render_summary_panel(
         return
 
     top = results[0]
-    bottom = results[-1]
-    spread = top.total_score - bottom.total_score if len(results) > 1 else 0.0
 
     with st.container(border=True):
         st.markdown("##### Interpretation & Insights")
@@ -63,9 +107,12 @@ def render_summary_panel(
             st.info("Comparative scenario interpretation is available when at least two cities are ranked.")
             return
 
+        second = results[1]
+        spread = top.total_score - second.total_score
+
         key_takeaway = (
             f"{top.city} currently leads with a total score of {top.total_score:.2f}, "
-            f"outperforming {bottom.city} by {spread:.2f} points under this weighting profile."
+            f"ahead of runner-up {second.city} by {spread:.2f} points under this weighting profile."
         )
         st.markdown(f'<p class="sw-insight-key">{key_takeaway}</p>', unsafe_allow_html=True)
         a, b = st.columns(2, gap="medium")
@@ -83,16 +130,16 @@ def render_summary_panel(
             st.markdown(
                 (
                     '<div class="sw-insight-card">'
-                    '<p class="sw-insight-title">Trailing Candidate</p>'
-                    f'<p class="sw-insight-body">{_plain_text(bottom_city_summary(bottom))}</p>'
+                    '<p class="sw-insight-title">Second-ranked Candidate</p>'
+                    f'<p class="sw-insight-body">{_plain_text(second_ranked_city_summary(second))}</p>'
                     "</div>"
                 ),
                 unsafe_allow_html=True,
             )
         c1, c2, c3 = st.columns(3, gap="small")
         c1.metric("Leader", top.city, f"{top.total_score:.2f}")
-        c2.metric("Trailer", bottom.city, f"{bottom.total_score:.2f}")
-        c3.metric("Spread", f"{spread:.2f}", "best vs worst")
+        c2.metric("Runner-up", second.city, f"{second.total_score:.2f}")
+        c3.metric("Spread", f"{spread:.2f}", "leader vs runner-up")
         st.info(scenario_summary(scenario_name, results))
 
 
@@ -105,11 +152,10 @@ subcategories in **5** themes. All scores use a **1–5** scale (**5** = best fo
 data-center siting).
 
 **1 · Subcategory scores**  
-Higher is always better for siting. Some inputs are inverted (e.g. *Tornado Frequency*:
-high risk → low score).
+Higher is always better for siting.
 
 **2 · Category score**  
-Subcategories within each theme are averaged (missing values excluded).
+Subcategories within each theme are averaged.
 
 **3 · Weighted total**
 ```
@@ -132,22 +178,25 @@ def render_scoring_explainer() -> None:
         render_scoring_explainer_body()
 
 
-def render_category_explainer_body() -> None:
+def render_category_explainer_body(
+    workbook_sources: Optional[Dict[str, List[Tuple[str, str]]]] = None,
+) -> None:
     """Category reference (no expander wrapper)."""
     for cat in CATEGORIES:
         st.markdown(f"**{cat}** · default weight **{DEFAULT_WEIGHTS[cat]:.0%}**")
         for sub in SUBCATEGORIES.get(cat, []):
             tooltip = SUBCATEGORY_TOOLTIPS.get(sub, "")
-            source = SUBCATEGORY_SOURCES.get(sub, "")
-            src_link = f" · [source]({source})" if source else ""
-            st.caption(f"• **{sub}** — {tooltip}{src_link}")
+            src_frag = _markdown_subcategory_sources(sub, workbook_sources)
+            st.caption(f"• **{sub}** — {tooltip}{src_frag}")
         st.markdown("")
 
 
-def render_category_explainer() -> None:
+def render_category_explainer(
+    workbook_sources: Optional[Dict[str, List[Tuple[str, str]]]] = None,
+) -> None:
     """Show each category with its subcategories and tooltips."""
     with st.expander("Category definitions", expanded=False):
-        render_category_explainer_body()
+        render_category_explainer_body(workbook_sources)
 
 
 def render_data_quality_panel(
@@ -173,20 +222,3 @@ def render_data_quality_panel(
             "Use **Refresh data** in the sidebar after changing the file."
         )
 
-
-def render_future_features() -> None:
-    """Show a roadmap panel for coming features."""
-    with st.expander("Roadmap", expanded=False):
-        st.markdown(
-            """
-| Direction | Status |
-| --- | --- |
-| Map integration (Folium / Mapbox) | Planned |
-| AI narrative summary | Planned |
-| Cooling-system sensitivity | Planned |
-| CMIP6 climate detail | Planned |
-| In-app workbook upload | Planned |
-| PDF export | Planned |
-| Sensitivity / Monte Carlo | Planned |
-"""
-        )

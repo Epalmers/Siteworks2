@@ -74,6 +74,31 @@ def top_city_summary(result: ScoringResult) -> str:
     )
 
 
+def second_ranked_city_summary(result: ScoringResult) -> str:
+    """One-paragraph summary for the #2-ranked (runner-up) city."""
+    strengths = _top_n(result.category_scores, n=2, best=True)
+    weaknesses = _top_n(result.category_scores, n=1, best=False)
+
+    strength_text = " and ".join(
+        f"{_adj(result.category_scores[c])} {_CAT_LABELS.get(c, c)}"
+        for c in strengths
+    )
+    weakness_text = (
+        f"{_CAT_LABELS.get(weaknesses[0], weaknesses[0])} "
+        f"({_adj(result.category_scores[weaknesses[0]])} score of "
+        f"{result.category_scores[weaknesses[0]]:.2f})"
+        if weaknesses else "no clear weaker categories versus the field"
+    )
+
+    return (
+        f"**{result.city}** ranks **second** with an overall score of "
+        f"**{result.total_score:.2f}/5.00**. "
+        f"It performs strongly on {strength_text}. "
+        f"The category that most distinguishes it below the leader is {weakness_text}. "
+        f"It stays a credible choice when organisational priorities favour those strengths."
+    )
+
+
 def bottom_city_summary(result: ScoringResult) -> str:
     """One-paragraph summary for the bottom-ranked city."""
     drivers = _top_n(result.category_scores, n=2, best=False)

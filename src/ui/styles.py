@@ -66,11 +66,21 @@ def apply_global_styles() -> None:
         -webkit-text-fill-color: transparent;
         background-clip: text;
     }
+    div.sw-hero .sw-hero-text {
+        margin-top: 0.35rem;
+    }
     div.sw-hero .sw-tagline {
+        color: #0f172a;
+        font-size: 1.08rem;
+        margin: 0 0 0.35rem 0;
+        font-weight: 600;
+    }
+    div.sw-hero .sw-hero-desc {
         color: var(--sw-muted);
-        font-size: 1.03rem;
-        margin: 0;
-        font-weight: 500;
+        font-size: 0.96rem;
+        line-height: 1.55;
+        margin: 0.45rem 0 0 0;
+        max-width: 920px;
     }
     div.sw-hero .sw-badge-row {
         margin-top: 0.58rem;
@@ -380,21 +390,26 @@ def apply_global_styles() -> None:
     )
 
 
-def render_hero(*, from_workbook: bool) -> None:
-    """Hero header with data-source badges."""
-    badge_live = (
-        '<span class="sw-badge sw-badge-live">Excel workbook</span>'
-        if from_workbook
-        else '<span class="sw-badge sw-badge-pilot">Workbook not loaded</span>'
-    )
-    badge_course = '<span class="sw-badge sw-badge-course">CIVE-580</span>'
-
+def render_hero() -> None:
+    """Hero header: product title and short orientation copy."""
     st.markdown(
-        f"""
+        """
 <div class="sw-hero">
-  <h1>Siteworks</h1>
-  <p class="sw-tagline">Data center site selection — weighted sustainability scoring</p>
-  <div class="sw-badge-row">{badge_live}{badge_course}</div>
+  <h1>DCS Dashboard</h1>
+  <div class="sw-hero-text">
+    <p class="sw-tagline">Data Center Siting Dashboard</p>
+    <p class="sw-hero-desc">
+      This tool compares candidate cities for data center development using weighted,
+      transparent scores across water, climate, economics, natural hazards, and conservation—
+      driven indicators.
+    </p>
+    <p class="sw-hero-desc">
+      <strong>How to use:</strong> Use the sidebar to set category weights and scenario presets
+      (and optional what-if modifiers). Review <strong>Overview</strong> for rankings and charts,
+      <strong>Compare</strong> for a two-city drill-down, and <strong>Data</strong> for metric-level detail.
+      Explore industrial zoning on the map in <strong>Overview</strong>. 
+    </p>
+  </div>
 </div>
         """,
         unsafe_allow_html=True,

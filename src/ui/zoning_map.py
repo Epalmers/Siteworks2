@@ -186,10 +186,16 @@ def render_industrial_zoning_map(selected_city: str) -> None:
     for row in ok_rows:
         n_p = row.get("n_parcels")
         if n_p is not None:
-            st.caption(
+            cap = (
                 f"**{row['city']}**: map shows the **full industrial extent** from **{n_p:,}** "
                 f"source parcels, merged into one area (boundaries simplified for display)."
             )
+            if row.get("city") == "Houston":
+                cap += (
+                    " Houston does not have a proper zone ordinance; the parcels shown are "
+                    "industrial land-use parcels and are meant to serve as a guide."
+                )
+            st.caption(cap)
 
     err_rows = [row for row in meta if not row.get("ok")]
     for row in err_rows:

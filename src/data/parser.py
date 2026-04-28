@@ -8,6 +8,7 @@ PARSING ASSUMPTIONS (documented here per project spec):
      • **City Assignments** — optional City ↔ numeric code (optional if Names are in Scores).
      • **Values** — optional same layout as Scores with raw measurements → raw_value.
      • **Account Weights** — optional Account | Weight for category defaults (must match CATEGORIES).
+     • **Sources** — optional City | Name … wide URLs (same columns as **Scores**) for per-city citations.
 2. Legacy single-sheet layouts if multi-sheet parse does not yield ≥3 cities:
    a) Sheet "Site Selector Data - edited" (or candidates in _find_sheet):
       Wide matrix OR long / tidy (row 5 headers; rows 2–3 city codes).
@@ -19,6 +20,7 @@ built-in pilot dataset defined in loader.py.
 """
 
 import logging
+from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -58,54 +60,62 @@ _HEADER_ALIASES: Dict[str, str] = {
 # Public parse entry point
 # ---------------------------------------------------------------------------
 
-def parse_rh_workbook(path: Path) -> Tuple[Optional[Dict[str, CityData]], Optional[Dict[str, float]]]:
+def parse_rh_workbook(
+    path: Path,
+) -> Tuple[
+    Optional[Dict[str, CityData]],
+    Optional[Dict[str, float]],
+    Optional[Dict[str, List[Tuple[str, str]]]],
+]:
     """
     Parse `Data_Center_Site_Selector_RH.xlsx`.
 
     Returns:
-        (city_data_map or None, category_weights or None)
-        Category weights are present when the **Account Weights** sheet was read successfully.
+        (city_data_map or None, category_weights or None, sources_by_subcategory or None)
+        – **sources_by_subcategory** maps each subcategory key to [(city_name, url), …]
+          from the **Sources** sheet when present; else ``None``.
 
-    Returns (None, None) if openpyxl is unavailable or the file cannot be read.
+    Returns ``(None, None, None)`` if openpyxl is unavailable or the file cannot be read.
     """
     try:
         import openpyxl  # noqa: PLC0415  (optional dependency)
     except ImportError:
         logger.warning("openpyxl not installed – cannot read workbook.")
-        return None, None
+        return None, None, None
 
     if not path.is_file():
         logger.info("Workbook not found at %s.", path)
-        return None, None
+        return None, None, None
 
     try:
         wb = openpyxl.load_workbook(path, data_only=True)
     except Exception as exc:  # noqa: BLE001
         logger.error("Failed to open workbook %s: %s", path, exc)
-        return None, None
+        return None, None, None
 
     try:
+        sources_map = _parse_sources_sheet(wb)
         parsed_ms, weights_ms = _try_parse_multisheet_workbook(wb)
         if parsed_ms and len(parsed_ms) >= 1:
-            return parsed_ms, weights_ms
+            return parsed_ms, weights_ms, sources_map
 
         sheet = _find_sheet(wb)
         if sheet is None:
             logger.warning("Could not locate a data sheet for legacy parsing.")
-            return None, None
+            return None, None, sources_map
 
         if _sheet_looks_long_format(sheet):
             parsed = _extract_scores_long(sheet)
             if parsed:
-                return parsed, None
+                return parsed, None, sources_map
             logger.error(
                 "Sheet appears to be long format, but long-format parsing returned no data. "
                 "Refusing fallback to wide parser to avoid misinterpreting workbook."
             )
-            return {}, None
+            return {}, None, sources_map
 
         legacy = _extract_scores(sheet)
-        return legacy if legacy else None, None
+        return legacy if legacy else None, None, sources_map
     finally:
         wb.close()
 
@@ -163,6 +173,69 @@ def _parse_city_assignments_sheet(sheet) -> Dict[int, str]:
         if name:
             out[code] = name
     return out
+
+
+def _extract_url_from_cell(raw) -> Optional[str]:
+    """First HTTP(S) URL from a cell; strip trailing notes after a space + opening parenthesis."""
+    if raw is None:
+        return None
+    s = str(raw).strip()
+    if not s.lower().startswith("http"):
+        return None
+    for sep in (" (", "\n", "\t"):
+        if sep in s:
+            s = s.split(sep, 1)[0].strip()
+    while s.endswith((".", ",")):
+        s = s[:-1]
+    return s or None
+
+
+def _parse_sources_sheet(wb) -> Optional[Dict[str, List[Tuple[str, str]]]]:
+    """**Sources**: same wide layout as **Scores** (Name + per-column URLs)."""
+    if "Sources" not in wb.sheetnames:
+        return None
+    sheet = wb["Sources"]
+    row1 = list(sheet.iter_rows(min_row=1, max_row=1, values_only=True))
+    if not row1 or not row1[0]:
+        return {}
+
+    headers = [
+        str(h).strip() if h is not None else "" for h in row1[0]
+    ]
+    if "Name" not in headers:
+        logger.warning("Sources sheet: no **Name** column — skipping citation parse.")
+        return {}
+
+    idx_name = headers.index("Name")
+    all_subs = {
+        sub: sub for subs in SUBCATEGORIES.values() for sub in subs
+    }
+    col_canon: List[Tuple[int, str]] = []
+    for i in range(2, len(headers)):
+        h = headers[i]
+        if not h:
+            continue
+        canon = _header_to_canonical(h, all_subs)
+        if canon:
+            col_canon.append((i, canon))
+
+    if not col_canon:
+        return {}
+
+    by_sub: Dict[str, List[Tuple[str, str]]] = defaultdict(list)
+    for row in sheet.iter_rows(min_row=2, values_only=True):
+        if not row or len(row) <= idx_name or row[idx_name] is None:
+            continue
+        city_name = str(row[idx_name]).strip()
+        if not city_name:
+            continue
+        for idx, canon in col_canon:
+            raw = row[idx] if len(row) > idx else None
+            url = _extract_url_from_cell(raw)
+            if url:
+                by_sub[canon].append((city_name, url))
+
+    return dict(by_sub)
 
 
 def _parse_scores_wide_sheet(
