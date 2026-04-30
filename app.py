@@ -52,7 +52,12 @@ st.set_page_config(
 
 from src.data.loader import load_city_data
 from src.logic.scoring import rank_cities
-from src.logic.scenarios import apply_drought_scenario, apply_future_climate_scenario
+from src.logic.scenarios import (
+    apply_drought_scenario,
+    apply_flood_event_scenario,
+    apply_wildfire_scenario,
+    apply_tech_boom_scenario,
+)
 from src.ui.sidebar import render_sidebar
 from src.ui.charts import (
     total_score_bar,
@@ -76,6 +81,15 @@ from src.ui.styles import (
     render_kpi_strip,
 )
 import src.logic.scoring as _scoring_module
+
+
+# Pretty labels used in the scenario banner shown under the KPI strip.
+_SCENARIO_FLAG_LABELS = {
+    "drought":   "Drought Year",
+    "flood":     "Major Flood Event",
+    "wildfire":  "Wildfire Season",
+    "tech_boom": "Tech Industry Boom",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -128,14 +142,14 @@ def _render_leader_strip(results):
     )
 
 
-def _render_top_summary(results, drought_mode, future_climate_mode):
+def _render_top_summary(results, scenario_flags):
     """Render hero, KPI strip, and snapshot row."""
     render_hero()
     top = results[0]
     runner_up = results[1] if len(results) > 1 else None
     spread = top.total_score - results[-1].total_score if len(results) > 1 else 0.0
     gap_to_second = (top.total_score - runner_up.total_score) if runner_up else 0.0
-    active_mods = int(drought_mode) + int(future_climate_mode)
+    active_mods = sum(1 for v in scenario_flags.values() if v)
     render_kpi_strip(
         [
             {
@@ -154,19 +168,19 @@ def _render_top_summary(results, drought_mode, future_climate_mode):
                 "sub": "best to worst",
             },
             {
-                "label": "Active Modifiers",
+                "label": "Active Scenarios",
                 "value": str(active_mods),
                 "sub": "what-if scenarios enabled",
             },
         ]
     )
 
-    if drought_mode or future_climate_mode:
-        pretty = []
-        if drought_mode:
-            pretty.append("Drought year (−20% water-related scores)")
-        if future_climate_mode:
-            pretty.append("2050 climate shift")
+    if any(scenario_flags.values()):
+        pretty = [
+            _SCENARIO_FLAG_LABELS[k]
+            for k, v in scenario_flags.items()
+            if v and k in _SCENARIO_FLAG_LABELS
+        ]
         render_scenario_banner(pretty)
 
     st.markdown("#### Snapshot")
@@ -277,15 +291,20 @@ def main():
     apply_global_styles()
 
     city_data_base, quality_notes, from_workbook, workbook_weights, workbook_sources = _load()
-    weights, scenario_name, drought_mode, future_climate_mode = render_sidebar(
+    weights, scenario_name, scenario_flags = render_sidebar(
         workbook_default_weights=workbook_weights,
     )
 
+    # Apply any active what-if scenarios (multipliers stack independently).
     city_data = city_data_base
-    if drought_mode:
+    if scenario_flags.get("drought"):
         city_data = apply_drought_scenario(city_data)
-    if future_climate_mode:
-        city_data = apply_future_climate_scenario(city_data)
+    if scenario_flags.get("flood"):
+        city_data = apply_flood_event_scenario(city_data)
+    if scenario_flags.get("wildfire"):
+        city_data = apply_wildfire_scenario(city_data)
+    if scenario_flags.get("tech_boom"):
+        city_data = apply_tech_boom_scenario(city_data)
 
     results = rank_cities(city_data, weights)
     if not results:
@@ -295,7 +314,7 @@ def main():
         st.info("Add **Data_Center_Site_Selector_RH.xlsx** to `data/` and click **Refresh data** in the sidebar.")
         return
 
-    _render_top_summary(results, drought_mode, future_climate_mode)
+    _render_top_summary(results, scenario_flags)
 
     tab_overview, tab_compare, tab_data, tab_about = st.tabs(
         ["Overview", "Compare", "Data", "About"]
@@ -370,8 +389,9 @@ Oklahoma City · Boston · Denver · Houston · Gainesville
 All metrics are **1 (worst) → 5 (best)** for siting. High *risk* metrics are inverted so **5** still means *better*.
 
 **How to use**  
-Use the sidebar weights and scenario toggles, compare two cities on **Compare**, and
-inspect drivers on **Data**.
+Choose a **Decision Mode** (or *Custom Weights* for manual tuning), optionally
+toggle one or more **What-if Scenarios**, compare two cities on **Compare**,
+and inspect drivers on **Data**.
 
 **Limits**  
 Five-city pilot; public-data estimates; not a substitute for professional engineering.

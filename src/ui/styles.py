@@ -288,6 +288,19 @@ def apply_global_styles() -> None:
         gap: 0.65rem;
         margin: 0.4rem 0 0.7rem 0;
     }
+    /* Label that sits above the [-] | slider | [+] row in the sidebar. */
+    .sw-weight-label {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #0f172a;
+        margin: 0.5rem 0 0.05rem 0;
+    }
+    /* Tighten the spacing of the +/- nudge buttons so they sit cleanly
+       beside the slider in the narrow sidebar. */
+    section[data-testid="stSidebar"] .stButton > button {
+        padding: 0.15rem 0.25rem;
+        min-height: 1.9rem;
+    }
     .sw-snapshot-card {
         border-radius: var(--sw-radius);
         border: 1px solid #e8eef6;
