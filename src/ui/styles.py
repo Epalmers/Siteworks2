@@ -189,6 +189,12 @@ def apply_global_styles() -> None:
         border: 1px solid #c7d9ef !important;
     }
 
+    /* Brand logo above Controls */
+    section[data-testid="stSidebar"] [data-testid="stImage"] {
+        padding-bottom: 0.35rem;
+        margin-bottom: 0.15rem;
+    }
+
     /* Sidebar section titles */
     section[data-testid="stSidebar"] h2 {
         font-size: 1rem !important;

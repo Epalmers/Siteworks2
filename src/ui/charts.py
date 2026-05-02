@@ -1,9 +1,8 @@
 """
 charts.py – Chart rendering helpers for Siteworks.
 
-All charts use Plotly for interactivity.  Chart styling is consistent:
-- Colour scale: green (high score) → yellow → red (low score)
-- Labels are always visible for non-engineer readability.
+All charts use Plotly for interactivity. Colors follow the Okabe–Ito CUD palette
+(via ``src.ui.palette``): discrete hues per city; sequential ramp for scores (low → high).
 """
 
 from typing import Dict, List, Optional
@@ -13,33 +12,17 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from src.data.schema import CATEGORIES, ScoringResult
+from src.ui.palette import (
+    CHART_ANNOTATION,
+    CHART_GRID,
+    CHART_REFERENCE_LINE,
+    CITY_COLORS,
+    city_color,
+)
 
-# Fixed city color system used across charts/UI.
-CITY_COLORS: Dict[str, str] = {
-    "Denver": "#4f8f74",
-    "Oklahoma City": "#587db7",
-    "Boston": "#7f6aa8",
-    "Gainesville": "#b28f73",
-    "Houston": "#b86b7e",
-}
-
-
-def city_color(city: str) -> str:
-    """Return the canonical color for a city."""
-    return CITY_COLORS.get(city, "#334155")
-
-_CHART_FONT = dict(family="'DM Sans', 'Segoe UI', sans-serif", size=13, color="#1e293b")
+_CHART_FONT = dict(family="'DM Sans', 'Segoe UI', sans-serif", size=13, color=CHART_ANNOTATION)
 _CHART_PAPER = "rgba(0,0,0,0)"
 _CHART_PLOT = "#f1f5f9"
-
-# Consistent colour scale for scores
-_COLOR_SCALE = [
-    [0.0, "#bf6864"],
-    [0.25, "#d8af8c"],
-    [0.5, "#e4dab8"],
-    [0.75, "#a5c3a3"],
-    [1.0, "#648f75"],
-]
 
 _CAT_SHORT: Dict[str, str] = {
     "Hydrological & Regulatory Risk": "Hydro",
@@ -61,20 +44,11 @@ def _base_layout(**kwargs) -> dict:
             bgcolor="#ffffff",
             font_size=13,
             font_family="'DM Sans', sans-serif",
-            bordercolor="#e2e8f0",
+            bordercolor=CHART_GRID,
         ),
     )
     base.update(kwargs)
     return base
-
-
-def _score_colour(score: float, min_s: float = 1.0, max_s: float = 5.0) -> str:
-    """Map a score to a hex colour along the green-yellow-red scale."""
-    norm = max(0.0, min(1.0, (score - min_s) / (max_s - min_s)))
-    for threshold, colour in reversed(_COLOR_SCALE):
-        if norm >= threshold:
-            return colour
-    return _COLOR_SCALE[0][1]
 
 
 # ---------------------------------------------------------------------------
@@ -94,7 +68,7 @@ def total_score_bar(results: List[ScoringResult]) -> go.Figure:
             x=scores,
             orientation="h",
             marker_color=colours,
-            marker_line_color="#dce6f2",
+            marker_line_color="#ffffff",
             marker_line_width=0.6,
             text=[f"{score:.2f}" for score in scores],
             textposition="outside",
@@ -104,11 +78,11 @@ def total_score_bar(results: List[ScoringResult]) -> go.Figure:
     fig.add_vline(
         x=avg_score,
         line_dash="dot",
-        line_color="#51667f",
+        line_color=CHART_REFERENCE_LINE,
         line_width=1.5,
         annotation_text=f"Average {avg_score:.2f}",
         annotation_position="top right",
-        annotation_font_color="#1e293b",
+        annotation_font_color=CHART_ANNOTATION,
     )
     fig.update_layout(
         **_base_layout(
@@ -116,7 +90,7 @@ def total_score_bar(results: List[ScoringResult]) -> go.Figure:
             xaxis=dict(
                 range=[0, 5.5],
                 title="Weighted score (1–5)",
-                gridcolor="#d8e1ec",
+                gridcolor=CHART_GRID,
                 zeroline=False,
                 tickfont=dict(size=12.5),
             ),
@@ -174,7 +148,7 @@ def category_score_grouped_bar(
             yaxis=dict(
                 range=[0, 5.5],
                 title="Category average (1–5)",
-                gridcolor="#d2dbe8",
+                gridcolor=CHART_GRID,
                 zeroline=False,
                 tickfont=dict(size=12.5),
             ),
@@ -236,14 +210,14 @@ def radar_chart(results: List[ScoringResult], highlight: Optional[str] = None) -
                 radialaxis=dict(
                     range=[0, 5],
                     tickvals=[1, 2, 3, 4, 5],
-                    tickfont=dict(size=11.5, color="#334155"),
-                    gridcolor="#dbe3ee",
-                    linecolor="#c6d3e2",
+                    tickfont=dict(size=11.5, color=CHART_ANNOTATION),
+                    gridcolor=CHART_GRID,
+                    linecolor=CHART_GRID,
                 ),
                 angularaxis=dict(
-                    linecolor="#c6d3e2",
-                    gridcolor="#dbe3ee",
-                    tickfont=dict(size=12.5, color="#334155"),
+                    linecolor=CHART_GRID,
+                    gridcolor=CHART_GRID,
+                    tickfont=dict(size=12.5, color=CHART_ANNOTATION),
                 ),
             ),
             title=dict(text="Category Profile (Radar)", font=dict(size=16)),
@@ -306,7 +280,7 @@ def comparison_bar(a: ScoringResult, b: ScoringResult) -> go.Figure:
             xaxis=dict(
                 range=[0, 5.8],
                 title="Score (1–5)",
-                gridcolor="#e2e8f0",
+                gridcolor=CHART_GRID,
                 zeroline=False,
             ),
             yaxis=dict(title=""),

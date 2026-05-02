@@ -18,8 +18,9 @@ _CAT_SHORT: Dict[str, str] = {
     "Biodiversity":                   "Biodiversity",
 }
 
+# Rankings table only: original red–amber–green heatmap (charts use Okabe–Ito in ``palette``).
 _TABLE_CMAP = LinearSegmentedColormap.from_list(
-    "siteworks_scores",
+    "siteworks_rankings_table",
     ["#be6863", "#d8b08d", "#e4dcbe", "#a8c3a4", "#688f76"],
 )
 

@@ -25,9 +25,15 @@ value MUST do so in an ``on_click=`` callback. Writing
 after the widget has been instantiated will raise StreamlitAPIException.
 """
 
+from pathlib import Path
 from typing import Dict, Optional, Tuple
 
 import streamlit as st
+
+# Project-root assets (PNG preferred if you add `assets/siteworks_logo.png`).
+_ASSETS_DIR = Path(__file__).resolve().parents[2] / "assets"
+_LOGO_PNG = _ASSETS_DIR / "siteworks_logo.png"
+_LOGO_SVG = _ASSETS_DIR / "siteworks_logo.svg"
 
 from src.data.schema import CATEGORIES, DEFAULT_WEIGHTS
 from src.logic.scenarios import (
@@ -115,6 +121,14 @@ def render_sidebar(
     saved = st.session_state.get("scenario_preset")
     if saved and saved not in SCENARIO_WEIGHTS:
         st.session_state["scenario_preset"] = CUSTOM_MODE_NAME
+
+    _logo_path: Optional[Path] = None
+    if _LOGO_PNG.is_file():
+        _logo_path = _LOGO_PNG
+    elif _LOGO_SVG.is_file():
+        _logo_path = _LOGO_SVG
+    if _logo_path is not None:
+        st.sidebar.image(str(_logo_path), use_container_width=True)
 
     st.sidebar.markdown("## Controls")
     st.sidebar.caption(

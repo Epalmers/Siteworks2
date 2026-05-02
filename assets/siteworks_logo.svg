@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 72" width="520" height="72">
+  <defs>
+    <linearGradient id="sw-brand" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0f766e"/>
+      <stop offset="50%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#4c1d95"/>
+    </linearGradient>
+  </defs>
+  <text x="0" y="34" font-family="system-ui, 'Segoe UI', sans-serif" font-size="26" font-weight="700" fill="url(#sw-brand)" letter-spacing="0.04em">SITEWORKS</text>
+  <text x="0" y="58" font-family="system-ui, 'Segoe UI', sans-serif" font-size="9.5" font-weight="500" fill="#475569" letter-spacing="0.12em">DATA CENTER SITING &amp; SUSTAINABILITY</text>
+</svg>
