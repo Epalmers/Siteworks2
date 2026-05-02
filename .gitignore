@@ -1,0 +1,88 @@
+# =============================================================================
+# Siteworks .gitignore
+# =============================================================================
+# Anything matching these patterns will NOT be uploaded to GitHub.
+
+# ---------------- Python ----------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ---------------- Virtual environments ----------------
+.venv/
+venv/
+env/
+ENV/
+*.virtualenv
+
+# ---------------- Streamlit ----------------
+# secrets.toml stores API keys / passwords. Never commit it.
+.streamlit/secrets.toml
+
+# ---------------- Editors / IDEs ----------------
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ---------------- OS junk ----------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ---------------- Environment / secrets ----------------
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.pfx
+*.p12
+credentials.json
+secrets.json
+service-account*.json
+
+# ---------------- Logs / debug output ----------------
+*.log
+logs/
+debug.log
+npm-debug.log*
+
+# ---------------- Test / coverage artifacts ----------------
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+.tox/
+.nox/
+coverage.xml
+*.cover
+
+# ---------------- Jupyter notebooks ----------------
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ---------------- Data files (large binaries — add manually if needed) ----------------
+data/*.docx
+data/*.pptx
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# ---------------- Personal scratch / experiments ----------------
+# A common safe spot for personal files you don't want pushed.
+scratch/
+sandbox/
+notes_personal*
+TODO_personal*
